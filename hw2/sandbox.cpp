@@ -24,6 +24,7 @@ static void afterMain(void){
 
 int system(const char *command){
     static SYSTEM ori_system = NULL;
+    cout << command << endl;
     ori_system = (SYSTEM)dlsym(handle, "system");
     return ori_system(command);
 }
@@ -42,5 +43,6 @@ int getopt(int argc, char * const argv[], const char *optstring){
              basedir = string(optarg);
              break;
     }
+
     return sandbox_cmd;
 }

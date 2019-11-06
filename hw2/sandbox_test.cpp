@@ -48,7 +48,7 @@ int main(int argc, char **argv)
 	string user_cmds[MAX_CMDS_NUM_PER_INPUT];
 
         string user_cmd = argv[optind++];
-	string user_cmd_args = " ";
+	string user_cmd_args = "";
 
 	int i = 0;
 	for (i = optind; i < argc; i++){

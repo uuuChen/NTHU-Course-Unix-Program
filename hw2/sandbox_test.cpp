@@ -1,9 +1,18 @@
-# include <unistd.h>
 # include <stdio.h>
 # include <stdlib.h>
+# include <string.h>
+# include <unistd.h>
+# include <dlfcn.h>
+# include <sys/types.h>
+# include <sys/stat.h>
+# include <fcntl.h>
+# include <dirent.h>
+# include <vector>
+# include <stdbool.h>
 
 # include <iostream>
 # include <string>
+# include <regex>
 
 # define DEFAULT_SOPATH "./sandbox.so"
 # define DEFAULT_BASEDIR "."
@@ -17,6 +26,11 @@ void print_usage(void){
     \t -p: set the path to sandbox.so, default = ./sandox.so\n \
     \t -d: restrict directory, default = .\n \
     \t --: seperate the arguments for sandbox and for the executed command\n\n");
+}
+
+bool is_cmd_valid(string cmd){
+    regex reg("exec*"); 
+    return ! (regex_match(cmd, reg) || cmd == "system");
 }
 
 int main(int argc, char **argv)
@@ -44,21 +58,23 @@ int main(int argc, char **argv)
     }
 
     if (argc > optind){
-	
-	string user_cmds[MAX_CMDS_NUM_PER_INPUT];
-
-        string user_cmd = argv[optind++];
+	string system_cmd = "";
+        string user_cmd = "";
 	string user_cmd_args = "";
+	string redirect_file_path = "";
 
-	int i = 0;
-	for (i = optind; i < argc; i++){
-	    user_cmd_args += " " + string(argv[i]);
+	user_cmd = string(argv[optind++]);
+	while(optind < argc){
+	    user_cmd_args += " " + string(argv[optind++]);
 	}
-	
-	if (user_cmd == "ls"){
-	    system((user_cmd + user_cmd_args).c_str());
+
+        if (is_cmd_valid(user_cmd)){
+	    system_cmd = "valid" + user_cmd + user_cmd_args;
+	}else{
+	    system_cmd = user_cmd + user_cmd_args;
 	}
-	
+	system(system_cmd.c_str());
+    	
     }
     return 0;
 }

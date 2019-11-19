@@ -25,7 +25,6 @@ typedef FILE *(*FOPEN)(const char *pathname, const char *mode);
 typedef int (*LINK)(const char *oldpath, const char *newpath);
 typedef int (*MKDIR)(const char *pathname, mode_t mode);
 typedef int (*OPEN)(const char *pathname, mode_t mode);
-
 typedef int (*OPENAT)(int dirfd, const char *pathname, int flags);
 typedef int (*OPENAT2)(int dirfd, const char *pathname, int flags, mode_t mode);
 typedef DIR *(*OPENDIR)(const char *name);

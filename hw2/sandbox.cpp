@@ -50,8 +50,9 @@ int chown(const char *pathname, uid_t owner, gid_t group){
 
 
 int creat(const char *pathname, mode_t mode){
-    static CREAT ori_creat = NULL;
+    CREAT ori_creat = NULL;
     ori_creat = (CREAT)dlsym(handle, "creat");
+    cout << ori_creat(pathname, mode);
     return ori_creat(pathname, mode); 
 }
 

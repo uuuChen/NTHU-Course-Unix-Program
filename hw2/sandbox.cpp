@@ -22,23 +22,23 @@ string get_parent_dir_path(string file_path){
     file_path_len = file_path.size();
     for(i = file_path_len-1; i >= 0; i--){
         if (file_path[i] == '/'){
-	    parent_dir_path = parent_dir_path.assign(file_path, 0, file_path_len-file_name_len);
+	    parent_dir_path = parent_dir_path.assign(file_path, 0, file_path_len-file_name_len-1);
+	    break;
 	}else{
 	    file_name_len ++;
 	}
     }
-    cout << "parent_dir_path: " << parent_dir_path << endl;
     return parent_dir_path;
 }
 
 void print_invalid_cmd_msg(string func_name, string cmd){
     printf("[sandbox] | function name: %s | command  line: %s | is not allowed\n", func_name.c_str(), cmd.c_str());
-    exit(EXIT_FAILURE);
+    // exit(EXIT_FAILURE);
 }
 
 void print_invalid_path_msg(string func_name, const char* path){ 
     printf("[sandbox] %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
-    exit(EXIT_FAILURE);
+    // exit(EXIT_FAILURE);
 }
 
 void make_sure_handle_exist(void){
@@ -47,22 +47,25 @@ void make_sure_handle_exist(void){
     }
 }
 
-bool is_valid_path(const char* path){
+bool is_valid_dir_path(const char* dir_path){
+    return basedir == get_resolved_path(dir_path);
+}
+
+bool is_valid_file_path(const char* file_path){
+    return basedir == get_parent_dir_path(get_resolved_path(file_path));
+}
+
+bool is_valid_dir_or_file_path(const char* path){ 
     struct stat stat_buf;
-    if (stat(path, &stat_buf) == -1){
-	printf("stat error...\n");
-        exit(EXIT_FAILURE);
+    if (stat(path, &stat_buf) == 0){
+        if(S_ISDIR(stat_buf.st_mode)){ // the path is a directory
+	    return is_valid_dir_path(path);
+	}else{
+	    return is_valid_file_path(path);
+	}
+    }else{ // the path is not exist
+        return false;
     }
-    bool valid = false;
-    if (S_ISDIR(stat_buf.st_mode)){ // the path is a directory
-        valid = (basedir == get_resolved_path(path));
-    }else if (S_ISREG(stat_buf.st_mode)){ // the path is a regular file
-        valid = (basedir == get_parent_dir_path(string(path)));
-    }else{
-        printf("the path isn't directory or regular file, exit....\n");
-	exit(EXIT_FAILURE);
-    } 
-    return valid;
 }
 
 static void beforeMain(void){
@@ -77,47 +80,70 @@ static void afterMain(void){
 }
 
 int chdir(const char *path){
-    static CHDIR ori_chdir = NULL;
-    if (! is_valid_path(path)){
+    if (is_valid_dir_path(path)){
+        static CHDIR ori_chdir = NULL;
+        ori_chdir = (CHDIR)dlsym(handle, "chdir");
+        return ori_chdir(path);
+    }else {
         print_invalid_path_msg("chdir", path);
     }
-    ori_chdir = (CHDIR)dlsym(handle, "chdir");
-    return ori_chdir(path); 
 }
 
 
 int chmod(const char *pathname, mode_t mode){
-    static CHMOD ori_chmod = NULL;
-    ori_chmod = (CHMOD)dlsym(handle, "chmod");
-    return ori_chmod(pathname, mode); 
+    if (is_valid_dir_or_file_path(pathname)){
+        static CHMOD ori_chmod = NULL;
+        ori_chmod = (CHMOD)dlsym(handle, "chmod");
+        return ori_chmod(pathname, mode); 
+    }else {
+        print_invalid_path_msg("chmod", pathname); 
+    }
 }
 
 
 int chown(const char *pathname, uid_t owner, gid_t group){
-    static CHOWN ori_chown = NULL;
-    ori_chown = (CHOWN)dlsym(handle, "chown");
-    return ori_chown(pathname, owner, group); 
+    if (is_valid_dir_or_file_path(pathname)){
+        static CHOWN ori_chown = NULL;
+        ori_chown = (CHOWN)dlsym(handle, "chown");
+        return ori_chown(pathname, owner, group); 
+    }else {
+        print_invalid_path_msg("chown", pathname);
+    }
 }
 
 
 int creat(const char *pathname, mode_t mode){
-    CREAT ori_creat = NULL;
-    ori_creat = (CREAT)dlsym(handle, "creat");
-    return ori_creat(pathname, mode); 
+    if (is_valid_file_path(pathname)){
+        static CREAT ori_creat = NULL;
+        ori_creat = (CREAT)dlsym(handle, "creat");
+        return ori_creat(pathname, mode); 
+    }else {
+        print_invalid_path_msg("creat", pathname);
+    }
 }
 
 FILE* fopen(const char *pathname, const char *mode){
-    static FOPEN ori_fopen = NULL;
-    make_sure_handle_exist();
-    ori_fopen = (FOPEN)dlsym(handle, "fopen");
-    return ori_fopen(pathname, mode); 
+    if (is_valid_file_path(pathname)){
+        static FOPEN ori_fopen = NULL;
+        make_sure_handle_exist();
+        ori_fopen = (FOPEN)dlsym(handle, "fopen");
+        return ori_fopen(pathname, mode); 
+    }else {
+        print_invalid_path_msg("fopen", pathname);
+    }
 }
 
-
 int link(const char *oldpath, const char *newpath){
-    static LINK ori_link = NULL;
-    ori_link = (LINK)dlsym(handle, "link");
-    return ori_link(oldpath, newpath); 
+    bool valid_oldpath = is_valid_file_path(oldpath);
+    bool valid_newpath = is_valid_file_path(newpath);
+    if (valid_oldpath && valid_newpath){
+        static LINK ori_link = NULL;
+        ori_link = (LINK)dlsym(handle, "link");
+        return ori_link(oldpath, newpath); 
+    }else {
+	if (! valid_oldpath) print_invalid_path_msg("link", oldpath);
+	if (! valid_newpath) print_invalid_path_msg("link", newpath);
+    }
 }
 
 int mkdir(const char *pathname, mode_t mode){

@@ -84,7 +84,7 @@ int main(int argc, char *argv[], char** envp)
 
     chdir("../hw2/");
     creat("./test.txt", 0755);
-    chmod("../test.txt", 0777);
+    chmod("./test.txt", 0777);
     fd = open("test.txt", O_RDWR);
     write(fd, test_msg, sizeof(test_msg));
     rename("./test.txt", "./test_rename.txt");

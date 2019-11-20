@@ -32,7 +32,7 @@ string get_parent_dir_path(string file_path){
 }
 
 void print_invalid_cmd_msg(string func_name, string cmd){
-    printf("[sandbox] | function name: %s | command  line: %s | is not allowed\n", func_name.c_str(), cmd.c_str());
+    printf("[sandbox]: | %s  %s | is not allowed\n", func_name.c_str(), cmd.c_str());
     // exit(EXIT_FAILURE);
 }
 
@@ -57,7 +57,9 @@ bool is_valid_file_path(const char* file_path){
 
 bool is_valid_dir_or_file_path(const char* path){ 
     struct stat stat_buf;
-    if (stat(path, &stat_buf) == 0){
+    static __XSTAT ori_stat = NULL;
+    ori_stat = (__XSTAT) dlsym(handle, "__xstat");
+    if (ori_stat(_STAT_VER_LINUX, path, &stat_buf) == 0){
         if(S_ISDIR(stat_buf.st_mode)){ // the path is a directory
 	    return is_valid_dir_path(path);
 	}else{
@@ -111,7 +113,6 @@ int chown(const char *pathname, uid_t owner, gid_t group){
     }
 }
 
-
 int creat(const char *pathname, mode_t mode){
     if (is_valid_file_path(pathname)){
         static CREAT ori_creat = NULL;
@@ -123,19 +124,19 @@ int creat(const char *pathname, mode_t mode){
 }
 
 FILE* fopen(const char *pathname, const char *mode){
-    if (is_valid_file_path(pathname)){
+    // if (is_valid_dir_or_file_path(pathname)){
         static FOPEN ori_fopen = NULL;
         make_sure_handle_exist();
         ori_fopen = (FOPEN)dlsym(handle, "fopen");
         return ori_fopen(pathname, mode); 
-    }else {
-        print_invalid_path_msg("fopen", pathname);
-    }
+    // }else {
+    //     print_invalid_path_msg("fopen", pathname);
+    // }
 }
 
 int link(const char *oldpath, const char *newpath){
-    bool valid_oldpath = is_valid_file_path(oldpath);
-    bool valid_newpath = is_valid_file_path(newpath);
+    bool valid_oldpath = is_valid_dir_or_file_path(oldpath);
+    bool valid_newpath = is_valid_dir_or_file_path(newpath);
     if (valid_oldpath && valid_newpath){
         static LINK ori_link = NULL;
         ori_link = (LINK)dlsym(handle, "link");
@@ -147,15 +148,23 @@ int link(const char *oldpath, const char *newpath){
 }
 
 int mkdir(const char *pathname, mode_t mode){
-    static MKDIR ori_mkdir = NULL;
-    ori_mkdir = (MKDIR)dlsym(handle, "mkdir");
-    return ori_mkdir(pathname, mode);
+    if (is_valid_file_path(pathname)){
+        static MKDIR ori_mkdir = NULL;
+        ori_mkdir = (MKDIR)dlsym(handle, "mkdir");
+        return ori_mkdir(pathname, mode);
+    }else {
+        print_invalid_path_msg("mkdir", pathname);
+    }
 }
 
 int open(const char *pathname, mode_t mode){
-    static OPEN ori_open = NULL;
-    ori_open = (OPEN)dlsym(handle, "open");
-    return ori_open(pathname, mode); 
+    if (is_valid_dir_or_file_path(pathname)){
+        static OPEN ori_open = NULL;
+        ori_open = (OPEN)dlsym(handle, "open");
+        return ori_open(pathname, mode); 
+    }else {
+        print_invalid_path_msg("open", pathname);
+    }
 }
 
 int openat(int dirfd, const char *pathname, int flags){

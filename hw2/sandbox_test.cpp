@@ -85,11 +85,13 @@ int main(int argc, char *argv[], char** envp)
     chdir("../hw2/");
     creat("./test.txt", 0755);
     chmod("./test.txt", 0777);
+    chown("./test.txt", 1000, 1000);
+    cout << link("./test.txt", "./testb.txt") << endl;
     fd = open("test.txt", O_RDWR);
-    write(fd, test_msg, sizeof(test_msg));
-    rename("./test.txt", "./test_rename.txt");
-    file = fopen("./temp_rename.txt", "rw");
+    write(fd, test_msg, sizeof(test_msg)); 
     close(fd);
+    rename("./test.txt", "./test_rename.txt");
+    file = fopen("./test_rename.txt", "rw");
 
     // execl("/bin/ls", "ls", "-al", "./", (char *)0);
     // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);

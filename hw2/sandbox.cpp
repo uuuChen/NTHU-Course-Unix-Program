@@ -33,12 +33,10 @@ string get_parent_dir_path(string file_path){
 
 void print_invalid_cmd_msg(string func_name, string cmd){
     printf("[sandbox]: | %s  %s | is not allowed\n", func_name.c_str(), cmd.c_str());
-    // exit(EXIT_FAILURE);
 }
 
 void print_invalid_path_msg(string func_name, const char* path){ 
     printf("[sandbox] %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
-    // exit(EXIT_FAILURE);
 }
 
 void make_sure_handle_exist(void){
@@ -55,17 +53,20 @@ bool is_valid_file_path(const char* file_path){
     return basedir == get_parent_dir_path(get_resolved_path(file_path));
 }
 
-bool is_valid_dir_or_file_path(const char* path){ 
+bool is_valid_dir_or_file_path(const char* path, string func_name){ 
     struct stat stat_buf;
     static __XSTAT ori_stat = NULL;
     ori_stat = (__XSTAT) dlsym(handle, "__xstat");
     if (ori_stat(_STAT_VER_LINUX, path, &stat_buf) == 0){
-        if(S_ISDIR(stat_buf.st_mode)){ // the path is a directory
-	    return is_valid_dir_path(path);
-	}else{
-	    return is_valid_file_path(path);
+        if(S_ISREG(stat_buf.st_mode)){ // the path is a directory
+            return is_valid_file_path(path);
+        }else if(S_ISDIR(stat_buf.st_mode)){
+            return is_valid_dir_path(path);
+        }else{
+	    return false;
 	}
     }else{ // the path is not exist
+	fprintf(stderr, "%s: %s\n", func_name.c_str(), strerror(errno));
         return false;
     }
 }
@@ -93,137 +94,136 @@ int chdir(const char *path){
 
 
 int chmod(const char *pathname, mode_t mode){
-    if (is_valid_dir_or_file_path(pathname)){
+    if (is_valid_dir_or_file_path(pathname, __func__)){
         static CHMOD ori_chmod = NULL;
-        ori_chmod = (CHMOD)dlsym(handle, "chmod");
+        ori_chmod = (CHMOD)dlsym(handle, __func__);
         return ori_chmod(pathname, mode); 
     }else {
-        print_invalid_path_msg("chmod", pathname); 
+        print_invalid_path_msg(__func__, pathname); 
     }
 }
 
 
 int chown(const char *pathname, uid_t owner, gid_t group){
-    if (is_valid_dir_or_file_path(pathname)){
+    if (is_valid_dir_or_file_path(pathname, __func__)){
         static CHOWN ori_chown = NULL;
-        ori_chown = (CHOWN)dlsym(handle, "chown");
+        ori_chown = (CHOWN)dlsym(handle, __func__);
         return ori_chown(pathname, owner, group); 
     }else {
-        print_invalid_path_msg("chown", pathname);
+        print_invalid_path_msg(__func__, pathname);
     }
 }
 
 int creat(const char *pathname, mode_t mode){
     if (is_valid_file_path(pathname)){
         static CREAT ori_creat = NULL;
-        ori_creat = (CREAT)dlsym(handle, "creat");
+        ori_creat = (CREAT)dlsym(handle, __func__);
         return ori_creat(pathname, mode); 
     }else {
-        print_invalid_path_msg("creat", pathname);
+        print_invalid_path_msg(__func__, pathname);
     }
 }
 
-FILE* fopen(const char *pathname, const char *mode){
-    // if (is_valid_dir_or_file_path(pathname)){
-        static FOPEN ori_fopen = NULL;
-        make_sure_handle_exist();
-        ori_fopen = (FOPEN)dlsym(handle, "fopen");
-        return ori_fopen(pathname, mode); 
-    // }else {
-    //     print_invalid_path_msg("fopen", pathname);
-    // }
+FILE* fopen(const char *pathname,const char *mode){
+    make_sure_handle_exist();
+    if (! is_valid_dir_or_file_path(pathname, __func__)){
+       print_invalid_path_msg(__func__, pathname);
+    }
+    static FOPEN ori_fopen = NULL;
+    ori_fopen = (FOPEN)dlsym(handle, __func__);
+    return ori_fopen(pathname,mode);
 }
 
 int link(const char *oldpath, const char *newpath){
-    bool valid_oldpath = is_valid_dir_or_file_path(oldpath);
-    bool valid_newpath = is_valid_dir_or_file_path(newpath);
+    bool valid_oldpath = is_valid_dir_or_file_path(oldpath, __func__);
+    bool valid_newpath = is_valid_dir_or_file_path(newpath, __func__);
     if (valid_oldpath && valid_newpath){
         static LINK ori_link = NULL;
-        ori_link = (LINK)dlsym(handle, "link");
+        ori_link = (LINK)dlsym(handle, __func__);
         return ori_link(oldpath, newpath); 
     }else {
-	if (! valid_oldpath) print_invalid_path_msg("link", oldpath);
-	if (! valid_newpath) print_invalid_path_msg("link", newpath);
+	if (! valid_oldpath) print_invalid_path_msg(__func__, oldpath);
+	if (! valid_newpath) print_invalid_path_msg(__func__, newpath);
     }
 }
 
 int mkdir(const char *pathname, mode_t mode){
     if (is_valid_file_path(pathname)){
         static MKDIR ori_mkdir = NULL;
-        ori_mkdir = (MKDIR)dlsym(handle, "mkdir");
+        ori_mkdir = (MKDIR)dlsym(handle, __func__);
         return ori_mkdir(pathname, mode);
     }else {
-        print_invalid_path_msg("mkdir", pathname);
+        print_invalid_path_msg(__func__, pathname);
     }
 }
 
 int open(const char *pathname, mode_t mode){
-    if (is_valid_dir_or_file_path(pathname)){
+    if (is_valid_dir_or_file_path(pathname, __func__)){
         static OPEN ori_open = NULL;
-        ori_open = (OPEN)dlsym(handle, "open");
+        ori_open = (OPEN)dlsym(handle, __func__);
         return ori_open(pathname, mode); 
     }else {
-        print_invalid_path_msg("open", pathname);
+        print_invalid_path_msg(__func__, pathname);
     }
 }
 
 int openat(int dirfd, const char *pathname, int flags){
     static OPENAT ori_openat = NULL;
-    ori_openat = (OPENAT)dlsym(handle, "openat");
+    ori_openat = (OPENAT)dlsym(handle, __func__);
     return ori_openat(dirfd, pathname, flags); 
 }
 
 int openat(int dirfd, const char *pathname, int flags, mode_t mode){
     static OPENAT2 ori_openat = NULL;
-    ori_openat = (OPENAT2)dlsym(handle, "openat");
+    ori_openat = (OPENAT2)dlsym(handle, __func__);
     return ori_openat(dirfd, pathname, flags, mode); 
 }
 
 DIR* opendir(const char *name){
     static OPENDIR ori_opendir = NULL;
-    ori_opendir = (OPENDIR)dlsym(handle, "opendir");
+    ori_opendir = (OPENDIR)dlsym(handle, __func__);
     return ori_opendir(name); 
 }
 
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
     static READLINK ori_readlink = NULL;
-    ori_readlink = (READLINK)dlsym(handle, "readlink");
+    ori_readlink = (READLINK)dlsym(handle, __func__);
     return ori_readlink(pathname, buf, bufsiz); 
 }
 
 int remove(const char *pathname){
     static REMOVE ori_remove = NULL;
-    ori_remove = (REMOVE)dlsym(handle, "remove");
+    ori_remove = (REMOVE)dlsym(handle, __func__);
     return ori_remove(pathname); 
 }
 
 int rename(const char *oldpath, const char *newpath){
     static RENAME ori_rename = NULL;
-    ori_rename = (RENAME)dlsym(handle, "rename");
+    ori_rename = (RENAME)dlsym(handle, __func__);
     return ori_rename(oldpath, newpath); 
 }
 
 int rmdir(const char *pathname){
     static RMDIR ori_rmdir = NULL;
-    ori_rmdir = (RMDIR)dlsym(handle, "rmdir");
+    ori_rmdir = (RMDIR)dlsym(handle, __func__);
     return ori_rmdir(pathname); 
 }
 
 int __xstat(int ver, const char *pathname, struct stat *statbuf){
     static __XSTAT ori_stat = NULL;
-    ori_stat = (__XSTAT)dlsym(handle, "__xstat");
+    ori_stat = (__XSTAT)dlsym(handle, __func__);
     return ori_stat(ver, pathname, statbuf); 
 }
 
 int symlink(const char *target, const char *linkpath){
     static SYMLINK ori_symlink = NULL;
-    ori_symlink = (SYMLINK)dlsym(handle, "symlink");
+    ori_symlink = (SYMLINK)dlsym(handle, __func__);
     return ori_symlink(target, linkpath); 
 }
 
 int unlink(const char *pathname){
     static UNLINK ori_unlink = NULL;
-    ori_unlink = (UNLINK)dlsym(handle, "unlink");
+    ori_unlink = (UNLINK)dlsym(handle, __func__);
     return ori_unlink(pathname); 
 }
 
@@ -248,15 +248,16 @@ int unlink(const char *pathname){
 // }
 // 
 // int execve(const char *filename, char *const argv[], char *const envp[]){
-//     cout << "in execve\n";
-//     cout << is_cmd_valid << endl;
-//     if (is_cmd_valid){
+//     // if (is_cmd_valid){
+//         printf("execve filename: %s\n", filename);
+// 	for (int i=0; i<sizeof(argv); i++) 
+// 	    printf("execve argv[%d]: %s\n", i, argv[i]);
 //         static EXECVE ori_execve = NULL;
 //         ori_execve = (EXECVE)dlsym(handle, "execve");
 //         return ori_execve(filename, argv, envp); 
-//     }else{
-//         print_invalid_cmd_msg("execve", "test test");
-//     }
+//     // }else{
+//     //     print_invalid_cmd_msg("execve", "test test");
+//     // }
 // }
 // 
 // int execvp(const char *file, char *const argv[]){
@@ -277,7 +278,6 @@ int system(const char *command){
 	is_cmd_valid = false;
         return return_value;
     }else{
-       check_str = check_str.assign(string(command), 0, 6);
        print_invalid_cmd_msg("system", string(command)); 
     }
 }

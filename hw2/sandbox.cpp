@@ -15,10 +15,18 @@ void print_invalid_msg(string func_name, string cmd){
     exit(EXIT_FAILURE);
 }
 
-static void beforeMain(void){
+void make_sure_handle_exist(void){
     if (! handle){
         handle = dlopen("libc.so.6", RTLD_LAZY);
     }
+}
+
+// bool is_path_valid(string path){
+//     return basedir == path;
+// }
+
+static void beforeMain(void){
+    make_sure_handle_exist();
 }
 
 static void afterMain(void){
@@ -52,94 +60,95 @@ int chown(const char *pathname, uid_t owner, gid_t group){
 int creat(const char *pathname, mode_t mode){
     CREAT ori_creat = NULL;
     ori_creat = (CREAT)dlsym(handle, "creat");
-    cout << ori_creat(pathname, mode);
     return ori_creat(pathname, mode); 
 }
 
-// FILE* fopen(const char *pathname, const char *mode){
-//     static FOPEN ori_fopen = NULL;
-//     ori_fopen = (FOPEN)dlsym(handle, "fopen");
-//     return ori_fopen(pathname, mode); 
-// }
-// 
-// int link(const char *oldpath, const char *newpath){
-//     static LINK ori_link = NULL;
-//     ori_link = (LINK)dlsym(handle, "link");
-//     return ori_link(oldpath, newpath); 
-// }
-// 
+FILE* fopen(const char *pathname, const char *mode){
+    static FOPEN ori_fopen = NULL;
+    make_sure_handle_exist();
+    ori_fopen = (FOPEN)dlsym(handle, "fopen");
+    return ori_fopen(pathname, mode); 
+}
+
+
+int link(const char *oldpath, const char *newpath){
+    static LINK ori_link = NULL;
+    ori_link = (LINK)dlsym(handle, "link");
+    return ori_link(oldpath, newpath); 
+}
+
 int mkdir(const char *pathname, mode_t mode){
     static MKDIR ori_mkdir = NULL;
     ori_mkdir = (MKDIR)dlsym(handle, "mkdir");
     return ori_mkdir(pathname, mode);
 }
-// 
-// int open(const char *pathname, mode_t mode){
-//     static OPEN ori_open = NULL;
-//     ori_open = (OPEN)dlsym(handle, "open");
-//     return ori_open(pathname, mode); 
-// }
-// 
-// int openat(int dirfd, const char *pathname, int flags){
-//     static OPENAT ori_openat = NULL;
-//     ori_openat = (OPENAT)dlsym(handle, "openat");
-//     return ori_openat(dirfd, pathname, flags); 
-// }
-// 
-// int openat(int dirfd, const char *pathname, int flags, mode_t mode){
-//     static OPENAT2 ori_openat = NULL;
-//     ori_openat = (OPENAT2)dlsym(handle, "openat");
-//     return ori_openat(dirfd, pathname, flags, mode); 
-// }
-// 
-// DIR* opendir(const char *name){
-//     static OPENDIR ori_opendir = NULL;
-//     ori_opendir = (OPENDIR)dlsym(handle, "opendir");
-//     return ori_opendir(name); 
-// }
-// 
-// ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
-//     static READLINK ori_readlink = NULL;
-//     ori_readlink = (READLINK)dlsym(handle, "readlink");
-//     return ori_readlink(pathname, buf, bufsiz); 
-// }
-// 
-// int remove(const char *pathname){
-//     static REMOVE ori_remove = NULL;
-//     ori_remove = (REMOVE)dlsym(handle, "remove");
-//     return ori_remove(pathname); 
-// }
-// 
-// int rename(const char *oldpath, const char *newpath){
-//     static RENAME ori_rename = NULL;
-//     ori_rename = (RENAME)dlsym(handle, "rename");
-//     return ori_rename(oldpath, newpath); 
-// }
-// 
-// int rmdir(const char *pathname){
-//     static RMDIR ori_rmdir = NULL;
-//     ori_rmdir = (RMDIR)dlsym(handle, "rmdir");
-//     return ori_rmdir(pathname); 
-// }
-// 
-// int stat(const char *pathname, struct stat *statbuf){
-//     static STAT ori_stat = NULL;
-//     ori_stat = (STAT)dlsym(handle, "stat");
-//     return ori_stat(pathname, statbuf); 
-// }
-// 
-// int symlink(const char *target, const char *linkpath){
-//     static SYMLINK ori_symlink = NULL;
-//     ori_symlink = (SYMLINK)dlsym(handle, "symlink");
-//     return ori_symlink(target, linkpath); 
-// }
-// 
-// int unlink(const char *pathname){
-//     static UNLINK ori_unlink = NULL;
-//     ori_unlink = (UNLINK)dlsym(handle, "unlink");
-//     return ori_unlink(pathname); 
-// }
-// 
+
+int open(const char *pathname, mode_t mode){
+    static OPEN ori_open = NULL;
+    ori_open = (OPEN)dlsym(handle, "open");
+    return ori_open(pathname, mode); 
+}
+
+int openat(int dirfd, const char *pathname, int flags){
+    static OPENAT ori_openat = NULL;
+    ori_openat = (OPENAT)dlsym(handle, "openat");
+    return ori_openat(dirfd, pathname, flags); 
+}
+
+int openat(int dirfd, const char *pathname, int flags, mode_t mode){
+    static OPENAT2 ori_openat = NULL;
+    ori_openat = (OPENAT2)dlsym(handle, "openat");
+    return ori_openat(dirfd, pathname, flags, mode); 
+}
+
+DIR* opendir(const char *name){
+    static OPENDIR ori_opendir = NULL;
+    ori_opendir = (OPENDIR)dlsym(handle, "opendir");
+    return ori_opendir(name); 
+}
+
+ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
+    static READLINK ori_readlink = NULL;
+    ori_readlink = (READLINK)dlsym(handle, "readlink");
+    return ori_readlink(pathname, buf, bufsiz); 
+}
+
+int remove(const char *pathname){
+    static REMOVE ori_remove = NULL;
+    ori_remove = (REMOVE)dlsym(handle, "remove");
+    return ori_remove(pathname); 
+}
+
+int rename(const char *oldpath, const char *newpath){
+    static RENAME ori_rename = NULL;
+    ori_rename = (RENAME)dlsym(handle, "rename");
+    return ori_rename(oldpath, newpath); 
+}
+
+int rmdir(const char *pathname){
+    static RMDIR ori_rmdir = NULL;
+    ori_rmdir = (RMDIR)dlsym(handle, "rmdir");
+    return ori_rmdir(pathname); 
+}
+
+int stat(const char *pathname, struct stat *statbuf){
+    static STAT ori_stat = NULL;
+    ori_stat = (STAT)dlsym(handle, "stat");
+    return ori_stat(pathname, statbuf); 
+}
+
+int symlink(const char *target, const char *linkpath){
+    static SYMLINK ori_symlink = NULL;
+    ori_symlink = (SYMLINK)dlsym(handle, "symlink");
+    return ori_symlink(target, linkpath); 
+}
+
+int unlink(const char *pathname){
+    static UNLINK ori_unlink = NULL;
+    ori_unlink = (UNLINK)dlsym(handle, "unlink");
+    return ori_unlink(pathname); 
+}
+
 // int execl(const char *path, const char *arg, ...){
 //     // print_invalid_msg();
 // }

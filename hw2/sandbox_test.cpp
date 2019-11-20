@@ -33,7 +33,7 @@ bool is_cmd_valid(string cmd){
     return ! (regex_match(cmd, reg) || cmd == "system");
 }
 
-int main(int argc, char **argv)
+int main(int argc, char *argv[], char** envp)
 {
     int sandbox_cmd = 0;
 
@@ -65,26 +65,39 @@ int main(int argc, char **argv)
 
 	user_cmd = string(argv[optind++]);
 	while(optind < argc){
-	    user_cmd_args += string(argv[optind++]) + " ";
+	    user_cmd_args += " " + string(argv[optind++]);
 	}
 
         if (is_cmd_valid(user_cmd)){
-	    system_cmd = "valid" + user_cmd + " " + user_cmd_args;
+	    system_cmd = "valid" + user_cmd + user_cmd_args;
 	}else{
-	    system_cmd = user_cmd + " " + user_cmd_args;
+	    system_cmd = user_cmd + user_cmd_args;
 	}
-	// system(system_cmd.c_str())
-	// char* argv[] = {user_cmd, user_cmd_args, NULL};
-	// execvp(user_cmd, argv);
-	
-	const char *file = user_cmd.c_str();
-	char* argv[3];
-	argv[0] = const_cast<char*>(user_cmd.c_str());
-	argv[1] = (char*)(user_cmd_args.c_str());
-	argv[2] = NULL;
-
-	execvp(file, argv);
-    	
+	system(system_cmd.c_str());
     }
+
+    // ----------------testing------------------
+    // FILE *file;
+    // char test_msg[] = "Hello world!\n";
+    // char *command[] = {"ls", "-al", "./", NULL};
+    // int fd;
+
+    // chdir("../");
+    // creat("test.txt", 0755);
+    // fd = open("test.txt", O_RDWR);
+    // write(fd, test_msg, sizeof(test_msg));
+    // rename("./test.txt", "./test_rename.txt");
+    // file = fopen("./temp_rename", "rw");
+    // close(fd);
+    // fclose(file);
+
+    // execl("/bin/ls", "ls", "-al", "./", (char *)0);
+    // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);
+    // execlp("ls", "ls", "-al", "./", (char *)0);
+    // execv("/bin/ls", command);
+    // execvp("ls", command);
+    // execve("/bin/ls", command, envp);
+
+    // system("ls -l");
     return 0;
 }

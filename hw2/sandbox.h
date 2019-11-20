@@ -6,7 +6,8 @@
 # include <sys/types.h>
 # include <sys/stat.h>
 # include <fcntl.h>
-#include <dirent.h>
+# include <dirent.h>
+# include <stdbool.h>
 
 # include <iostream>
 # include <regex>
@@ -32,7 +33,7 @@ typedef ssize_t (*READLINK)(const char *pathname, char *buf, size_t bufsiz);
 typedef int (*REMOVE)(const char *pathname);
 typedef int (*RENAME)(const char *oldpath, const char *newpath);
 typedef int (*RMDIR)(const char *pathname);
-typedef int (*STAT)(const char *pathname, struct stat *statbuf);
+typedef int (*__XSTAT)(int ver, const char *path, struct stat *buf);
 typedef int (*SYMLINK)(const char *target, const char *linkpath);
 typedef int (*UNLINK)(const char *pathname);
 

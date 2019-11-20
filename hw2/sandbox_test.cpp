@@ -82,14 +82,13 @@ int main(int argc, char *argv[], char** envp)
     char *command[] = {"ls", "-al", "./", NULL};
     int fd;
 
-    chdir("./");
-    creat("test.txt", 0755);
+    chdir("../hw2/");
+    creat("../test.txt", 0755);
     fd = open("test.txt", O_RDWR);
     write(fd, test_msg, sizeof(test_msg));
     rename("./test.txt", "./test_rename.txt");
     file = fopen("./temp_rename.txt", "rw");
     close(fd);
-    fclose(file);
 
     // execl("/bin/ls", "ls", "-al", "./", (char *)0);
     // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);
@@ -97,7 +96,6 @@ int main(int argc, char *argv[], char** envp)
     // execv("/bin/ls", command);
     // execvp("ls", command);
     // execve("/bin/ls", command, envp);
-
-    // system("ls -l");
+    system("ls -l");
     return 0;
 }

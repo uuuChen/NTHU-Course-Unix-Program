@@ -149,10 +149,10 @@ int unlink(const char *pathname){
     return ori_unlink(pathname); 
 }
 
-// int execl(const char *path, const char *arg, ...){
-//     // print_invalid_msg();
-// }
-// 
+int execl(const char *path, const char *arg, ...){
+    // print_invalid_msg();
+}
+
 // int execle(const char *path, const char *arg, ...){
 //     // print_invalid_msg();
 // }

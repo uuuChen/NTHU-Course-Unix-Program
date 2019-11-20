@@ -77,19 +77,19 @@ int main(int argc, char *argv[], char** envp)
     }
 
     // ----------------testing------------------
-    // FILE *file;
-    // char test_msg[] = "Hello world!\n";
-    // char *command[] = {"ls", "-al", "./", NULL};
-    // int fd;
+    FILE *file;
+    char test_msg[] = "Hello world!\n";
+    char *command[] = {"ls", "-al", "./", NULL};
+    int fd;
 
-    // chdir("../");
-    // creat("test.txt", 0755);
-    // fd = open("test.txt", O_RDWR);
-    // write(fd, test_msg, sizeof(test_msg));
-    // rename("./test.txt", "./test_rename.txt");
-    // file = fopen("./temp_rename", "rw");
-    // close(fd);
-    // fclose(file);
+    chdir("./");
+    creat("test.txt", 0755);
+    fd = open("test.txt", O_RDWR);
+    write(fd, test_msg, sizeof(test_msg));
+    rename("./test.txt", "./test_rename.txt");
+    file = fopen("./temp_rename.txt", "rw");
+    close(fd);
+    fclose(file);
 
     // execl("/bin/ls", "ls", "-al", "./", (char *)0);
     // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);

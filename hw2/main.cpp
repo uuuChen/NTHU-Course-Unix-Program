@@ -57,48 +57,26 @@ int main(int argc, char *argv[], char** envp)
 	}
     }
 
+    const char* csopath = sopath.c_str();
+    setenv("LD_PRELOAD", csopath, 1);
+
     if (argc > optind){
 	string system_cmd = "";
         string user_cmd = "";
 	string user_cmd_args = "";
 	string redirect_file_path = "";
-
-	user_cmd = string(argv[optind++]);
+	int argv_arr_len = 0; 
+	int argv_len = 0;
+	int i = 0;
+	char **exec_argv;
+	argv_arr_len = argc - optind; 
+	exec_argv = (char**)malloc(argv_arr_len*sizeof(char*)+1);
 	while(optind < argc){
-	    user_cmd_args += " " + string(argv[optind++]);
+	    exec_argv[i++] = argv[optind++];
 	}
-
-        if (is_cmd_valid(user_cmd)){
-	    system_cmd = "valid" + user_cmd + user_cmd_args;
-	}else{
-	    system_cmd = user_cmd + user_cmd_args;
-	}
-	system(system_cmd.c_str());
-    }
-
-    // ----------------testing------------------
-    FILE *file;
-    char test_msg[] = "Hello world!\n";
-    char *command[] = {"ls", "-al", "./", NULL};
-    int fd;
-
-    chdir("../hw2/");
-    creat("./test.txt", 0755);
-    chmod("./test.txt", 0777);
-    chown("./test.txt", 1000, 1000);
-    cout << link("./test.txt", "./testb.txt") << endl;
-    fd = open("test.txt", O_RDWR);
-    write(fd, test_msg, sizeof(test_msg)); 
-    close(fd);
-    rename("./test.txt", "./test_rename.txt");
-    file = fopen("./test_rename.txt", "rw");
-
-    // execl("/bin/ls", "ls", "-al", "./", (char *)0);
-    // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);
-    // execlp("ls", "ls", "-al", "./", (char *)0);
-    // execv("/bin/ls", command);
-    // execvp("ls", command);
-    // execve("/bin/ls", command, envp);
-    system("ls -l");
-    return 0;
+	exec_argv[i] = NULL;
+	char exec_pathname[100] = "/bin/";
+	strcat(exec_pathname, exec_argv[0]);
+	execve(exec_pathname, exec_argv, envp);
+    } 
 }

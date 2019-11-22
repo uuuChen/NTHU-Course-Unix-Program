@@ -264,23 +264,24 @@ int unlink(const char *pathname){
 //     cout << "in execvp\n";
 //     // print_invalid_cmd_msg();
 // }
-
-int system(const char *command){
-    string check_str = "";
-    string ori_command = "";
-    static SYSTEM ori_system = NULL;
-    check_str = check_str.assign(string(command), 0, 5);
-    ori_command = string(command).substr(5);;
-    ori_system = (SYSTEM)dlsym(handle, "system");
-    if(check_str == "valid"){
-	is_cmd_valid = true;
-	int return_value = ori_system(ori_command.c_str());
-	is_cmd_valid = false;
-        return return_value;
-    }else{
-       print_invalid_cmd_msg("system", string(command)); 
-    }
-}
+// 
+// int system(const char *command){
+//     printf("in system\n");
+//     string check_str = "";
+//     string ori_command = "";
+//     static SYSTEM ori_system = NULL;
+//     check_str = check_str.assign(string(command), 0, 5);
+//     ori_command = string(command).substr(5);;
+//     ori_system = (SYSTEM)dlsym(handle, "system");
+//     if(check_str == "valid"){
+// 	is_cmd_valid = true;
+// 	int return_value = ori_system(ori_command.c_str());
+// 	is_cmd_valid = false;
+//         return return_value;
+//     }else{
+//        print_invalid_cmd_msg("system", string(command)); 
+//     }
+// }
 
 int getopt(int argc, char * const argv[], const char *optstring){
     static GETOPT ori_getopt = NULL;

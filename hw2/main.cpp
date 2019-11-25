@@ -35,14 +35,18 @@ bool is_cmd_valid(string cmd){
     return ! (regex_match(cmd, reg) || cmd == "system");
 }
 
-bool is_cmd_exist_in_bin(string cmd){
+bool is_cmd_exist_in_shell(string cmd, string& cmd_dir){
     FILE *fp;
-    string cmd_path = "/bin/" + cmd;
-    if((fp=fopen(cmd_path.c_str(), "r")) == NULL){
-        return false;
-    }else{
-        return true;
+    string cmd_dirs[2] = {"/bin/", "/usr/bin/"};
+    int i;
+    for(i=0; i<2; i++){
+	string cmd_path = cmd_dirs[i] + cmd;
+        if((fp=fopen(cmd_path.c_str(), "r")) != NULL){
+	    cmd_dir = cmd_dirs[i];
+	    return true;
+	}
     }
+    return false;
 }
 
 void print_envp(void){
@@ -78,11 +82,8 @@ int main(int argc, char *argv[], char** envp)
 	}
     }
 
-//     const char* csopath = sopath.c_str();
-    // print_envp();
     setenv("LD_PRELOAD", sopath.c_str(), 1);
     setenv("basedir", basedir.c_str(), 1);
-    // print_envp();
 
     if (argc > optind){
 	int argv_arr_len = 0; 
@@ -95,13 +96,16 @@ int main(int argc, char *argv[], char** envp)
 	    exec_argv[i++] = argv[optind++];
 	}
 	exec_argv[i] = NULL;
-	char exec_pathname[MAX_CMD_BUF];
+
+	string cmd_dir = "";
+	string cmd = string(exec_argv[0]);
 	const char* temp;
-	if(is_cmd_exist_in_bin(string(exec_argv[0]))){
-	    temp = (string("/bin/") + string(exec_argv[0])).c_str();
+	if(is_cmd_exist_in_shell(cmd, cmd_dir)){
+	    temp = (cmd_dir + cmd).c_str();
 	}else{
-	    temp = exec_argv[0];
+	    temp = cmd.c_str();
 	}
+	char exec_pathname[MAX_CMD_BUF];
 	strcpy(exec_pathname, temp);
 	execve(exec_pathname, exec_argv, environ);
     }else{

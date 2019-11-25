@@ -40,7 +40,7 @@ string get_parent_dir_path(string file_path){
 }
 
 void print_invalid_cmd_msg(string func_name, string cmd){
-    fprintf(stderr, "[sandbox] | %s(%s): not allowed\n", func_name.c_str(), cmd.c_str());
+    fprintf(stderr, "[sandbox] %s(%s): not allowed\n", func_name.c_str(), cmd.c_str());
 }
 
 void print_invalid_path_msg(string func_name, const char* path){ 
@@ -56,7 +56,7 @@ void make_sure_handle_exist(void){
 void make_sure_basedir_exist(void){
     if (basedir.empty()){
         const char* env_basedir = getenv("basedir");
-        basedir = get_resolved_path(env_basedir);
+        basedir += get_resolved_path(env_basedir);
     }
 }
 bool is_valid_dir_path(const char* dir_path){
@@ -106,6 +106,7 @@ int chdir(const char *path){
         return ori_chdir(path);
     }else {
         print_invalid_path_msg("chdir", path);
+	return -1;
     }
 }
 
@@ -117,6 +118,7 @@ int chmod(const char *pathname, mode_t mode){
         return ori_chmod(pathname, mode); 
     }else {
         print_invalid_path_msg(__func__, pathname); 
+	return -1;
     }
 }
 
@@ -128,6 +130,7 @@ int chown(const char *pathname, uid_t owner, gid_t group){
         return ori_chown(pathname, owner, group); 
     }else {
         print_invalid_path_msg(__func__, pathname);
+	return -1;
     }
 }
 
@@ -138,17 +141,20 @@ int creat(const char *pathname, mode_t mode){
         return ori_creat(pathname, mode); 
     }else {
         print_invalid_path_msg(__func__, pathname);
+	return -1;
     }
 }
 
 FILE* fopen(const char *pathname,const char *mode){
     make_sure_handle_exist();
-    if (! is_valid_dir_or_file_path(pathname, __func__)){
-       print_invalid_path_msg(__func__, pathname);
+    if (is_valid_dir_or_file_path(pathname, __func__)){
+        static FOPEN ori_fopen = NULL;
+        ori_fopen = (FOPEN)dlsym(handle, __func__);
+        return ori_fopen(pathname,mode);
+    } else{
+        print_invalid_path_msg(__func__, pathname);
+	return NULL;
     }
-    static FOPEN ori_fopen = NULL;
-    ori_fopen = (FOPEN)dlsym(handle, __func__);
-    return ori_fopen(pathname,mode);
 }
 
 int link(const char *oldpath, const char *newpath){
@@ -161,6 +167,7 @@ int link(const char *oldpath, const char *newpath){
     }else {
 	if (! valid_oldpath) print_invalid_path_msg(__func__, oldpath);
 	if (! valid_newpath) print_invalid_path_msg(__func__, newpath);
+	return -1;
     }
 }
 
@@ -171,16 +178,19 @@ int mkdir(const char *pathname, mode_t mode){
         return ori_mkdir(pathname, mode);
     }else {
         print_invalid_path_msg(__func__, pathname);
+	return -1;
     }
 }
 
 int open(const char *pathname, mode_t mode){
     if (is_valid_dir_or_file_path(pathname, __func__)){
+	printf("valid pathname = %s\n", pathname);
         static OPEN ori_open = NULL;
         ori_open = (OPEN)dlsym(handle, __func__);
         return ori_open(pathname, mode); 
     }else {
         print_invalid_path_msg(__func__, pathname);
+	return -1;
     }
 }
 
@@ -197,9 +207,14 @@ int openat(int dirfd, const char *pathname, int flags, mode_t mode){
 }
 
 DIR* opendir(const char *name){
-    static OPENDIR ori_opendir = NULL;
-    ori_opendir = (OPENDIR)dlsym(handle, __func__);
-    return ori_opendir(name); 
+    if (is_valid_dir_path(name)){
+        static OPENDIR ori_opendir = NULL;
+        ori_opendir = (OPENDIR)dlsym(handle, __func__);
+        return ori_opendir(name); 
+    } else{
+        print_invalid_path_msg(__func__, name);
+	return NULL;
+    }
 }
 
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
@@ -221,15 +236,26 @@ int rename(const char *oldpath, const char *newpath){
 }
 
 int rmdir(const char *pathname){
-    static RMDIR ori_rmdir = NULL;
-    ori_rmdir = (RMDIR)dlsym(handle, __func__);
-    return ori_rmdir(pathname); 
+    if (is_valid_file_path(pathname)){
+        static RMDIR ori_rmdir = NULL;
+        ori_rmdir = (RMDIR)dlsym(handle, __func__);
+        return ori_rmdir(pathname); 
+    } else{
+        print_invalid_path_msg(__func__, pathname);
+	return -1;
+    }
 }
 
 int __xstat(int ver, const char *pathname, struct stat *statbuf){
-    static __XSTAT ori_stat = NULL;
-    ori_stat = (__XSTAT)dlsym(handle, __func__);
-    return ori_stat(ver, pathname, statbuf); 
+    if (is_valid_dir_or_file_path(pathname, __func__)){
+	printf("valid pathname: %s\n", pathname);
+        static __XSTAT ori_stat = NULL;
+        ori_stat = (__XSTAT)dlsym(handle, __func__);
+        return ori_stat(ver, pathname, statbuf); 
+    } else{
+        print_invalid_path_msg(__func__, pathname);
+	return -1;
+    }
 }
 
 int symlink(const char *target, const char *linkpath){
@@ -245,68 +271,37 @@ int unlink(const char *pathname){
 }
 
 int execl(const char *path, const char *arg, ...){
-    cout << "in execl\n";
-    // print_invalid_cmd_msg();
+    print_invalid_cmd_msg(__func__, path);
+    return -1;
 }
 
 int execle(const char *path, const char *arg, ...){
-    cout << "in execle\n";
-    // print_invalid_cmd_msg();
+    print_invalid_cmd_msg(__func__, path);
+    return -1;
 }
 
-int execlp(const char *file, char *const argv[]){
-    cout << "in execlp\n";
-    // print_invalid_cmd_msg();
+int execlp(const char *file, const char *arg, ...){
+    print_invalid_cmd_msg(__func__, file);
+    return -1;
 }
 
 int execv(const char *path, char *const argv[]){
-    cout << "in execv\n";
-    // print_invalid_cmd_msg();
+    print_invalid_cmd_msg(__func__, path);
+    return -1;
 }
 
 int execve(const char *filename, char *const argv[], char *const envp[]){
-    print_invalid_cmd_msg("execve", filename);
+    print_invalid_cmd_msg(__func__, filename);
+    return -1;
 }
 
 int execvp(const char *file, char *const argv[]){
-    cout << "in execvp\n";
-    // print_invalid_cmd_msg();
+    print_invalid_cmd_msg(__func__, file);
+    return -1;
 }
 
 int system(const char *command){
-    printf("in system\n");
-    // string check_str = "";
-    // string ori_command = "";
-    // static SYSTEM ori_system = NULL;
-    // check_str = check_str.assign(string(command), 0, 5);
-    // ori_command = string(command).substr(5);;
-    // ori_system = (SYSTEM)dlsym(handle, "system");
-    // if(check_str == "valid"){
-    //     is_cmd_valid = true;
-    //     int return_value = ori_system(ori_command.c_str());
-    //     is_cmd_valid = false;
-    //     return return_value;
-    // }else{
-       print_invalid_cmd_msg("system", string(command)); 
-    // }
+    print_invalid_cmd_msg(__func__, string(command)); 
+    return -1;
 }
 
-// int getopt(int argc, char * const argv[], const char *optstring){
-//     static GETOPT ori_getopt = NULL;
-//     int sandbox_cmd = 0;
-//     ori_getopt = (GETOPT)dlsym(handle, "getopt");
-//     sandbox_cmd = ori_getopt(argc, argv, optstring);
-//     sopath = get_resolved_path(DEFAULT_SOPATH);
-//     basedir = get_resolved_path(DEFAULT_BASEDIR);
-//     switch(sandbox_cmd){
-//          case 'p':
-//              sopath = get_resolved_path(optarg);
-//              break;
-// 
-//          case 'd': 
-//              basedir = get_resolved_path(optarg);
-//              break;
-//     }
-//     printf("[getopt] basedir: %s\n", basedir);
-//     return sandbox_cmd;
-// }

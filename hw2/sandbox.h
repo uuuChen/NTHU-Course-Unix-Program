@@ -40,7 +40,7 @@ typedef int (*UNLINK)(const char *pathname);
 // reject following functions
 typedef int (*EXECL)(const char *path, const char *arg, ...);
 typedef int (*EXECLE)(const char *path, const char *arg, ...);
-typedef int (*EXECLP)(const char *file, char *const argv[]);
+typedef int (*EXECLP)(const char *file, const char *arg, ...);
 typedef int (*EXECV)(const char *path, char *const argv[]);
 typedef int (*EXECVE)(const char *filename, char *const argv[], char *const envp[]);
 typedef int (*EXECVP)(const char *file, char *const argv[]);

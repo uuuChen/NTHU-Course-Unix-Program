@@ -1,14 +1,22 @@
 # include "sandbox.h"
 
 # define MAX_BUF_SIZE 128
-# define DEFAULT_SOPATH "./sandbox.so"
-# define DEFAULT_BASEDIR "./"
+
+extern char** environ;
 
 void *handle = NULL;
 
-string sopath = DEFAULT_SOPATH;
-string basedir = DEFAULT_BASEDIR;
+string basedir = "";
 static bool is_cmd_valid = false;
+
+void print_envp(void){
+    char **envir = environ;
+    while(*envir){
+        fprintf(stdout, "%s\n", *envir);
+        envir++;
+    }
+    fprintf(stderr, "\n\n\n");
+}
 
 string get_resolved_path(const char* path){ 
      char resolved_path[MAX_BUF_SIZE];
@@ -32,11 +40,11 @@ string get_parent_dir_path(string file_path){
 }
 
 void print_invalid_cmd_msg(string func_name, string cmd){
-    printf("[sandbox]: | %s  %s | is not allowed\n", func_name.c_str(), cmd.c_str());
+    fprintf(stderr, "[sandbox] | %s(%s): not allowed\n", func_name.c_str(), cmd.c_str());
 }
 
 void print_invalid_path_msg(string func_name, const char* path){ 
-    printf("[sandbox] %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
+    fprintf(stderr, "[sandbox] %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
 }
 
 void make_sure_handle_exist(void){
@@ -45,11 +53,19 @@ void make_sure_handle_exist(void){
     }
 }
 
+void make_sure_basedir_exist(void){
+    if (basedir.empty()){
+        const char* env_basedir = getenv("basedir");
+        basedir = get_resolved_path(env_basedir);
+    }
+}
 bool is_valid_dir_path(const char* dir_path){
+    make_sure_basedir_exist();
     return basedir == get_resolved_path(dir_path);
 }
 
 bool is_valid_file_path(const char* file_path){
+    make_sure_basedir_exist();
     return basedir == get_parent_dir_path(get_resolved_path(file_path));
 }
 
@@ -73,6 +89,7 @@ bool is_valid_dir_or_file_path(const char* path, string func_name){
 
 static void beforeMain(void){
     make_sure_handle_exist();
+    make_sure_basedir_exist();
 }
 
 static void afterMain(void){
@@ -227,78 +244,69 @@ int unlink(const char *pathname){
     return ori_unlink(pathname); 
 }
 
-// int execl(const char *path, const char *arg, ...){
-//     cout << "in execl\n";
-//     // print_invalid_cmd_msg();
-// }
-// 
-// int execle(const char *path, const char *arg, ...){
-//     cout << "in execle\n";
-//     // print_invalid_cmd_msg();
-// }
-// 
-// int execlp(const char *file, char *const argv[]){
-//     cout << "in execlp\n";
-//     // print_invalid_cmd_msg();
-// }
-// 
-// int execv(const char *path, char *const argv[]){
-//     cout << "in execv\n";
-//     // print_invalid_cmd_msg();
-// }
-// 
-// int execve(const char *filename, char *const argv[], char *const envp[]){
-//     // if (is_cmd_valid){
-//         printf("execve filename: %s\n", filename);
-// 	for (int i=0; i<sizeof(argv); i++) 
-// 	    printf("execve argv[%d]: %s\n", i, argv[i]);
-//         static EXECVE ori_execve = NULL;
-//         ori_execve = (EXECVE)dlsym(handle, "execve");
-//         return ori_execve(filename, argv, envp); 
-//     // }else{
-//     //     print_invalid_cmd_msg("execve", "test test");
-//     // }
-// }
-// 
-// int execvp(const char *file, char *const argv[]){
-//     cout << "in execvp\n";
-//     // print_invalid_cmd_msg();
-// }
-// 
-// int system(const char *command){
-//     printf("in system\n");
-//     string check_str = "";
-//     string ori_command = "";
-//     static SYSTEM ori_system = NULL;
-//     check_str = check_str.assign(string(command), 0, 5);
-//     ori_command = string(command).substr(5);;
-//     ori_system = (SYSTEM)dlsym(handle, "system");
-//     if(check_str == "valid"){
-// 	is_cmd_valid = true;
-// 	int return_value = ori_system(ori_command.c_str());
-// 	is_cmd_valid = false;
-//         return return_value;
-//     }else{
-//        print_invalid_cmd_msg("system", string(command)); 
-//     }
-// }
-
-int getopt(int argc, char * const argv[], const char *optstring){
-    static GETOPT ori_getopt = NULL;
-    int sandbox_cmd = 0;
-    ori_getopt = (GETOPT)dlsym(handle, "getopt");
-    sandbox_cmd = ori_getopt(argc, argv, optstring);
-    sopath = get_resolved_path(DEFAULT_SOPATH);
-    basedir = get_resolved_path(DEFAULT_BASEDIR);
-    switch(sandbox_cmd){
-         case 'p':
-             sopath = get_resolved_path(optarg);
-             break;
-
-         case 'd': 
-             basedir = get_resolved_path(optarg);
-             break;
-    }
-
-    return sandbox_cmd;
+int execl(const char *path, const char *arg, ...){
+    cout << "in execl\n";
+    // print_invalid_cmd_msg();
 }
+
+int execle(const char *path, const char *arg, ...){
+    cout << "in execle\n";
+    // print_invalid_cmd_msg();
+}
+
+int execlp(const char *file, char *const argv[]){
+    cout << "in execlp\n";
+    // print_invalid_cmd_msg();
+}
+
+int execv(const char *path, char *const argv[]){
+    cout << "in execv\n";
+    // print_invalid_cmd_msg();
+}
+
+int execve(const char *filename, char *const argv[], char *const envp[]){
+    print_invalid_cmd_msg("execve", filename);
+}
+
+int execvp(const char *file, char *const argv[]){
+    cout << "in execvp\n";
+    // print_invalid_cmd_msg();
+}
+
+int system(const char *command){
+    printf("in system\n");
+    // string check_str = "";
+    // string ori_command = "";
+    // static SYSTEM ori_system = NULL;
+    // check_str = check_str.assign(string(command), 0, 5);
+    // ori_command = string(command).substr(5);;
+    // ori_system = (SYSTEM)dlsym(handle, "system");
+    // if(check_str == "valid"){
+    //     is_cmd_valid = true;
+    //     int return_value = ori_system(ori_command.c_str());
+    //     is_cmd_valid = false;
+    //     return return_value;
+    // }else{
+       print_invalid_cmd_msg("system", string(command)); 
+    // }
+}
+
+// int getopt(int argc, char * const argv[], const char *optstring){
+//     static GETOPT ori_getopt = NULL;
+//     int sandbox_cmd = 0;
+//     ori_getopt = (GETOPT)dlsym(handle, "getopt");
+//     sandbox_cmd = ori_getopt(argc, argv, optstring);
+//     sopath = get_resolved_path(DEFAULT_SOPATH);
+//     basedir = get_resolved_path(DEFAULT_BASEDIR);
+//     switch(sandbox_cmd){
+//          case 'p':
+//              sopath = get_resolved_path(optarg);
+//              break;
+// 
+//          case 'd': 
+//              basedir = get_resolved_path(optarg);
+//              break;
+//     }
+//     printf("[getopt] basedir: %s\n", basedir);
+//     return sandbox_cmd;
+// }

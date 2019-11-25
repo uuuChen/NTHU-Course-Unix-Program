@@ -15,9 +15,11 @@
 # include <regex>
 
 # define DEFAULT_SOPATH "./sandbox.so"
-# define DEFAULT_BASEDIR "."
-# define MAX_CMD_BUFFER 128
+# define DEFAULT_BASEDIR "./"
+# define MAX_CMD_BUF 128
 # define MAX_CMDS_NUM_PER_INPUT 16
+
+extern char** environ;
 
 using namespace std;
 
@@ -31,6 +33,25 @@ void print_usage(void){
 bool is_cmd_valid(string cmd){
     regex reg("exec*"); 
     return ! (regex_match(cmd, reg) || cmd == "system");
+}
+
+bool is_cmd_exist_in_bin(string cmd){
+    FILE *fp;
+    string cmd_path = "/bin/" + cmd;
+    if((fp=fopen(cmd_path.c_str(), "r")) == NULL){
+        return false;
+    }else{
+        return true;
+    }
+}
+
+void print_envp(void){
+    char **envir = environ;
+    while(*envir){
+        fprintf(stdout, "%s\n", *envir);
+	envir++;
+    }
+    fprintf(stdout, "\n\n\n");
 }
 
 int main(int argc, char *argv[], char** envp)
@@ -57,14 +78,13 @@ int main(int argc, char *argv[], char** envp)
 	}
     }
 
-    const char* csopath = sopath.c_str();
-    setenv("LD_PRELOAD", csopath, 1);
+//     const char* csopath = sopath.c_str();
+    // print_envp();
+    setenv("LD_PRELOAD", sopath.c_str(), 1);
+    setenv("basedir", basedir.c_str(), 1);
+    // print_envp();
 
     if (argc > optind){
-	string system_cmd = "";
-        string user_cmd = "";
-	string user_cmd_args = "";
-	string redirect_file_path = "";
 	int argv_arr_len = 0; 
 	int argv_len = 0;
 	int i = 0;
@@ -75,8 +95,16 @@ int main(int argc, char *argv[], char** envp)
 	    exec_argv[i++] = argv[optind++];
 	}
 	exec_argv[i] = NULL;
-	char exec_pathname[100] = "/bin/";
-	strcat(exec_pathname, exec_argv[0]);
-	execve(exec_pathname, exec_argv, envp);
+	char exec_pathname[MAX_CMD_BUF];
+	const char* temp;
+	if(is_cmd_exist_in_bin(string(exec_argv[0]))){
+	    temp = (string("/bin/") + string(exec_argv[0])).c_str();
+	}else{
+	    temp = exec_argv[0];
+	}
+	strcpy(exec_pathname, temp);
+	execve(exec_pathname, exec_argv, environ);
+    }else{
+        fprintf(stderr, "no command given.\n");
     } 
 }

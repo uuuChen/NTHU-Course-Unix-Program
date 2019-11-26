@@ -47,8 +47,10 @@ typedef int (*EXECVP)(const char *file, char *const argv[]);
 typedef int (*SYSTEM)(const char *command);
 
 // additional fuctions
-typedef int (*GETOPT)(int argc, char * const argv[], const char *optstring);
 
+typedef int (*DUP)(int oldfd);
+typedef int (*DUP2)(int oldfd, int newfd);
+typedef int (*DUP3)(int oldfd, int newfd, int flags);
 
 
 

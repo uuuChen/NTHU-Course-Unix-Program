@@ -4,4 +4,4 @@ all:
 	g++ -fPIC -shared -o sandbox.so sandbox.cpp -ldl
 
 clean:
-	rm test_rename.txt sandbox sandbox.so testfile
+	rm test_rename.txt sandbox sandbox.so testfile test text.txt

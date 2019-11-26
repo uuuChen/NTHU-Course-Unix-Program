@@ -82,8 +82,10 @@ int main(int argc, char *argv[], char** envp)
 	}
     }
 
+    // print_envp();
     setenv("LD_PRELOAD", sopath.c_str(), 1);
     setenv("basedir", basedir.c_str(), 1);
+    // print_envp();
 
     if (argc > optind){
 	int argv_arr_len = 0; 
@@ -100,12 +102,12 @@ int main(int argc, char *argv[], char** envp)
 	string cmd_dir = "";
 	string cmd = string(exec_argv[0]);
 	const char* temp;
+	char exec_pathname[MAX_CMD_BUF];
 	if(is_cmd_exist_in_shell(cmd, cmd_dir)){
 	    temp = (cmd_dir + cmd).c_str();
 	}else{
 	    temp = cmd.c_str();
 	}
-	char exec_pathname[MAX_CMD_BUF];
 	strcpy(exec_pathname, temp);
 	execve(exec_pathname, exec_argv, environ);
     }else{

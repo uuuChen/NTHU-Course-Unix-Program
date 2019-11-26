@@ -31,32 +31,28 @@ int main(int argc, char* argv[], char** envp){
     close(fd1);
     rename("./test.txt", "./test_rename.txt");
     file = fopen("./test_rename.txt", "rw");
-    mkdir("./testdir", S_IRWXO);
+    mkdir("../testdir", S_IRWXO);
     remove("./testdir");
     DIR* dir = opendir("../hw2/");
     fd1 = dirfd(dir);
     if ((fd2 = openat(fd1, "hw2", O_RDWR)) == -1){
         printf("openat error!\n");
-    }else{
-        printf("%d %d\n", getpid(), fd2);
     }
     if ((fd3 = openat(fd1, "test_rename.txt", O_RDWR, S_IRWXO)) == -1){
         printf("openat error!\n");
-    }else{
-        printf("%d %d\n", getpid(), fd3);
     }
     write(fd3, "surprise~~~", 13);
     close(fd2);
     close(fd3);
     closedir(dir);
 
-    // execl("/bin/ls", "ls", "-al", "./", (char *)0);
-    // execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);
-    // execlp("ls", "ls", "-al", "./", (char *)0);
-    // execv("/bin/ls", command);
-    // execvp("ls", command);
-    // execve("/bin/ls", command, envp);
-    // system("ls -l");
+    execl("/bin/ls", "ls", "-al", "./", (char *)0);
+    execle("/bin/ls", "ls", "-al", "./", (char *)0, envp);
+    execlp("ls", "ls", "-al", "./", (char *)0);
+    execv("/bin/ls", command);
+    execvp("ls", command);
+    execve("/bin/ls", command, envp);
+    system("ls -l");
 
     return 0;
 }

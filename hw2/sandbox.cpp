@@ -46,14 +46,19 @@ void make_sure_basedir_exist(void){
 }
 
 void make_sure_output_stream_exist(void){
-    int stderr_fd;
-    int stdout_fd;
     static FOPEN ori_fopen = NULL;
     make_sure_handle_exist();
     ori_fopen = (FOPEN)dlsym(handle, "fopen");
     if (! output_file){
-        output_file = ori_fopen("temp.txt", "w");
+        // output_file = ori_fopen("temp.txt", "w");
+        output_file = stderr;
     }
+}
+
+void make_sure_setting_done(void){
+    make_sure_handle_exist();
+    make_sure_basedir_exist();
+    make_sure_output_stream_exist();
 }
 
 void restore_output_stream(void){
@@ -63,20 +68,20 @@ void restore_output_stream(void){
 void print_envp(void){
     char **envir = environ;
     while(*envir){
-        fprintf(stderr, "%s\n", *envir);
+        fprintf(output_file, "%s\n", *envir);
         envir++;
     }
-    fprintf(stderr, "\n\n\n");
+    fprintf(output_file, "\n\n\n");
 }
 
 void print_invalid_cmd_msg(string func_name, string cmd){
-    make_sure_output_stream_exist();
-    fprintf(stderr, "[sandbox]: %s(%s): not allowed\n", func_name.c_str(), cmd.c_str());
+    make_sure_setting_done();
+    fprintf(output_file, "[sandbox]: %s(%s): not allowed\n", func_name.c_str(), cmd.c_str());
 }
 
 void print_invalid_path_msg(string func_name, const char* path){ 
-    make_sure_output_stream_exist();
-    fprintf(stderr, "[sandbox]: %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
+    make_sure_setting_done();
+    fprintf(output_file, "[sandbox]: %s: access to %s is not allowed\n", func_name.c_str(), get_resolved_path(path).c_str());
 }
 
 string int_to_str(int num){
@@ -97,12 +102,12 @@ string get_file_path_by_fd(int fd){
 
 }
 bool is_valid_dir_path(const char* dir_path){
-    make_sure_basedir_exist();
+    make_sure_setting_done();
     return basedir == get_resolved_path(dir_path);
 }
 
 bool is_valid_file_path(const char* file_path){
-    make_sure_basedir_exist();
+    make_sure_setting_done();
     return basedir == get_parent_dir_path(get_resolved_path(file_path));
 }
 
@@ -119,26 +124,24 @@ bool is_valid_dir_or_file_path(const char* path, string func_name){
 	    return false;
 	}
     }else{ // the path is not exist
-	fprintf(stderr, "%s: %s\n", func_name.c_str(), strerror(errno));
+	fprintf(output_file, "%s: %s\n", func_name.c_str(), strerror(errno));
         return false;
     }
 }
 
 static void beforeMain(void){
-    make_sure_handle_exist();
-    make_sure_basedir_exist();
-    make_sure_output_stream_exist();
+    make_sure_setting_done();
 }
 
 static void afterMain(void){
     if (dlclose(handle) != 0){
-	fprintf(stderr, "Close Handle Error...\n");
+	fprintf(output_file, "Close Handle Error...\n");
 	exit(EXIT_FAILURE);
     }
 }
 
 int chdir(const char *path){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_path(path)){
         static CHDIR ori_chdir = NULL;
         ori_chdir = (CHDIR)dlsym(handle, "chdir");
@@ -151,7 +154,7 @@ int chdir(const char *path){
 
 
 int chmod(const char *pathname, mode_t mode){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static CHMOD ori_chmod = NULL;
         ori_chmod = (CHMOD)dlsym(handle, __func__);
@@ -164,7 +167,7 @@ int chmod(const char *pathname, mode_t mode){
 
 
 int chown(const char *pathname, uid_t owner, gid_t group){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static CHOWN ori_chown = NULL;
         ori_chown = (CHOWN)dlsym(handle, __func__);
@@ -176,7 +179,7 @@ int chown(const char *pathname, uid_t owner, gid_t group){
 }
 
 int creat(const char *pathname, mode_t mode){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_file_path(pathname)){
         static CREAT ori_creat = NULL;
         ori_creat = (CREAT)dlsym(handle, __func__);
@@ -188,12 +191,12 @@ int creat(const char *pathname, mode_t mode){
 }
 
 FILE* fopen(const char *pathname,const char *mode){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
-    make_sure_handle_exist();
+    make_sure_setting_done();
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static FOPEN ori_fopen = NULL;
         ori_fopen = (FOPEN)dlsym(handle, __func__);
-        return ori_fopen(pathname,mode);
+        return ori_fopen(pathname, mode);
     } else{
         print_invalid_path_msg(__func__, pathname);
 	return NULL;
@@ -201,7 +204,7 @@ FILE* fopen(const char *pathname,const char *mode){
 }
 
 int link(const char *oldpath, const char *newpath){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     bool valid_oldpath = is_valid_dir_or_file_path(oldpath, __func__);
     bool valid_newpath = is_valid_dir_or_file_path(newpath, __func__);
     if (valid_oldpath && valid_newpath){
@@ -216,7 +219,7 @@ int link(const char *oldpath, const char *newpath){
 }
 
 int mkdir(const char *pathname, mode_t mode){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_file_path(pathname)){
         static MKDIR ori_mkdir = NULL;
         ori_mkdir = (MKDIR)dlsym(handle, __func__);
@@ -228,7 +231,7 @@ int mkdir(const char *pathname, mode_t mode){
 }
 
 int open(const char *pathname, int flags, ...){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static OPEN ori_open = NULL;
         ori_open = (OPEN)dlsym(handle, __func__);
@@ -240,7 +243,7 @@ int open(const char *pathname, int flags, ...){
 }
 
 int openat(int dirfd, const char *pathname, int flags, ...){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     string dir_file_path = get_file_path_by_fd(dirfd);
     string open_path = dir_file_path + "/" + pathname;
     if (is_valid_dir_or_file_path(open_path.c_str(), __func__)){
@@ -254,7 +257,7 @@ int openat(int dirfd, const char *pathname, int flags, ...){
 }
 
 DIR* opendir(const char *name){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_path(name)){
         static OPENDIR ori_opendir = NULL;
         ori_opendir = (OPENDIR)dlsym(handle, __func__);
@@ -266,7 +269,7 @@ DIR* opendir(const char *name){
 }
 
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_file_path(pathname)){
         static READLINK ori_readlink = NULL;
         ori_readlink = (READLINK)dlsym(handle, __func__);
@@ -278,7 +281,7 @@ ssize_t readlink(const char *pathname, char *buf, size_t bufsiz){
 }
 
 int remove(const char *pathname){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_file_path(pathname)){
         static REMOVE ori_remove = NULL;
         ori_remove = (REMOVE)dlsym(handle, __func__);
@@ -290,7 +293,7 @@ int remove(const char *pathname){
 }
 
 int rename(const char *oldpath, const char *newpath){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     bool valid_oldpath = is_valid_file_path(oldpath);
     bool valid_newpath = is_valid_file_path(newpath);
     if (valid_oldpath && valid_newpath){
@@ -305,7 +308,7 @@ int rename(const char *oldpath, const char *newpath){
 }
 
 int rmdir(const char *pathname){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_file_path(pathname)){
         static RMDIR ori_rmdir = NULL;
         ori_rmdir = (RMDIR)dlsym(handle, __func__);
@@ -317,7 +320,7 @@ int rmdir(const char *pathname){
 }
 
 int __xstat(int ver, const char *pathname, struct stat *statbuf){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static __XSTAT ori_stat = NULL;
         ori_stat = (__XSTAT)dlsym(handle, __func__);
@@ -329,7 +332,7 @@ int __xstat(int ver, const char *pathname, struct stat *statbuf){
 }
 
 int symlink(const char *target, const char *linkpath){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     bool valid_target = is_valid_dir_or_file_path(target, __func__);
     bool valid_linkpath = is_valid_file_path(linkpath) || is_valid_dir_path(linkpath);
     if (valid_target && valid_linkpath){
@@ -344,7 +347,7 @@ int symlink(const char *target, const char *linkpath){
 }
 
 int unlink(const char *pathname){
-    fprintf(stderr, "[sandbox]: in %s\n", __func__);
+    fprintf(output_file, "[sandbox]: in %s\n", __func__);
     if (is_valid_dir_or_file_path(pathname, __func__)){
         static UNLINK ori_unlink = NULL;
         ori_unlink = (UNLINK)dlsym(handle, __func__);

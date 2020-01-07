@@ -24,11 +24,11 @@ struct Request {
 };
 
 struct FileInfo {
-    bool exist;
     FILE* fp;
     char* abs_file_path;
     char* MIME_type;
     char* status_code;
+    char* errorMsg_html_code;
     int content_len;
 };
 
@@ -106,6 +106,29 @@ char* get_file_MIME_type(char* file_name){
     return NULL;
 }
 
+char* get_errorMsg_html_code(char* status_code, char* file_path){
+    char* html_code = (char*) malloc(0xfffff * sizeof(char));
+    char* temp = (char*) malloc(0xfffff * sizeof(char));
+    sprintf(html_code, "<html><head><title>%s</title></head>", status_code);
+    strcat(html_code, "<br>");
+    strcat(html_code, "<body>");
+    if(strcmp(status_code, "301 Moved Permanently") == 0){
+    }else{
+	sprintf(temp, "<h3>You don't have permission to access %s on this server.</h3>", file_path);
+        strcat(html_code, temp);
+    }
+    strcat(html_code, "</body></html>");
+    printf("html_code: %s\n", html_code);
+    return html_code;
+}
+
+struct FileInfo get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_code, char* file_path){
+    fileInfo_ptr->status_code = status_code; 
+    fileInfo_ptr->errorMsg_html_code = get_errorMsg_html_code(fileInfo_ptr->status_code, file_path);
+    fileInfo_ptr->content_len = strlen(fileInfo_ptr->errorMsg_html_code);
+    return *fileInfo_ptr;
+}
+
 struct FileInfo get_fileInfo(char* file_name){
     FileInfo fileInfo;
     struct stat stat_buf;
@@ -113,29 +136,30 @@ struct FileInfo get_fileInfo(char* file_name){
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
     fileInfo.MIME_type = (char*) "text/html";
-    if(stat(file_path, &stat_buf) < 0){ // file does not exist
-        fileInfo.exist = false;
-	fileInfo.status_code = (char*) "403 Forbidden";  // use 403 intentionally
+    if(stat(file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
+        fileInfo = get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
 	return fileInfo;
     }
-    fileInfo.exist = true;
     fileInfo.abs_file_path = file_path;
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
-	    fileInfo.status_code = (char*) "301 Moved Permanently";
+            fileInfo = get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
 	    return fileInfo;
 	}
 	fileInfo.status_code = (char*) "200 OK";
 	strcpy(idxHTML_file_path, file_path);
 	strcat(idxHTML_file_path, "index.html");
         if(check_file_exist(idxHTML_file_path)){ // index.html exists
-	    printf("index.html exists\n");
+	    stat(idxHTML_file_path, &stat_buf); 
+	    fileInfo.content_len = stat_buf.st_size;
+	    fileInfo.fp = fopen(idxHTML_file_path, "rb");
 	}else{  // index.html does not exist
 	    printf("index.html does not exist\n");
 	}
     }else{ // other formats
         if((access(file_path, R_OK)) < 0){ // does not have read permission
-	    fileInfo.status_code = (char*) "404 NOT FOUND";
+            fileInfo = get_errorFileInfo(&fileInfo, (char*) "404 NOT FOUND", file_path);
+	    return fileInfo;
 	}else{ // has read permission
 	    fileInfo.status_code = (char*) "200 OK";
 	    fileInfo.MIME_type = get_file_MIME_type(file_name);
@@ -147,38 +171,22 @@ struct FileInfo get_fileInfo(char* file_name){
 }
 
 char* get_header(struct FileInfo fileInfo){
-    char* header = (char*) malloc(0xffff * sizeof(char));
-    char* content_len_buf = (char*) malloc(128 * sizeof(char));
-    strcpy(header, "HTTP/1.1 ");
-    strcat(header, fileInfo.status_code);
-    strcat(header, CRLF);
-    strcat(header, "Server: nginx");
-    strcat(header, CRLF);
-    strcat(header, "Content-Type: ");
-    strcat(header, fileInfo.MIME_type);
-    strcat(header, CRLF);
-    strcat(header, "Content-Length: ");
+    string header;	    
+    char *content_len_buf = (char*) malloc(128 * sizeof(char));
+    char *c_header = (char*) malloc(0xffff * sizeof(char));
     sprintf(content_len_buf, "%d", fileInfo.content_len);
-    strcat(header, content_len_buf);
-    strcat(header, CRLF);
-    // CRLF
-    strcat(header, CRLF);
-    printf("header:\n%s\n", header);
-    return header;
-    // string header;	    
-    // char* content_len_buf = (char*) malloc(128 * sizeof(char));
-    // sprintf(content_len_buf, "%d", fileInfo.content_len);
-    // header = (string("HTTP/1.0 ") + CRLF + 
-    //           string("Server: nginx") + CRLF +
-    //           string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF + 
-    //           string("Content-Length: ") + string(content_len_buf) + CRLF + CRLF);
-    // return (char*) header.c_str();
+    header = (string("HTTP/1.1 ") + string(fileInfo.status_code) + CRLF +
+              string("Server: nginx") + CRLF +
+              string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF + 
+              string("Content-Length: ") + string(content_len_buf) + CRLF + CRLF);
+    strcpy(c_header, (char*) header.c_str());
+    return c_header;
 }
 
 void server_respond(int connfd){
     struct Request req;
     struct FileInfo fileInfo;
-    char sendBuf[1000000];
+    char sendBuf[0xfffff];
     int send_bytes;
     req = get_request(connfd); 
     if(strcmp(req.method, "GET") == 0){ // GET    
@@ -188,6 +196,14 @@ void server_respond(int connfd){
             fprintf(stderr, "send error\n");
             exit(-1);
         }
+	if(fileInfo.errorMsg_html_code){	
+	    if(write(connfd, fileInfo.errorMsg_html_code, fileInfo.content_len) < 0){
+                fprintf(stderr, "send error\n");
+                exit(-1);
+	    }
+	    fclose(fileInfo.fp);
+	    exit(0);
+	}
 	while(!feof(fileInfo.fp)){
 	    send_bytes = fread(sendBuf, sizeof(char), sizeof(sendBuf), fileInfo.fp);
 	    if(send_bytes == 0)

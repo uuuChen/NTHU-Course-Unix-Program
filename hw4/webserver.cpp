@@ -25,7 +25,7 @@ struct Request {
 
 struct FileInfo {
     FILE* fp;
-    char* abs_file_path;
+    char abs_file_path[128];
     char* MIME_type;
     char* status_code;
     char* errorMsg_html_code;
@@ -70,6 +70,7 @@ struct Request get_request(int connfd){
         exit(-1);
     }
     recv_buf[recv_bytes] = '\0';
+    printf("recv buf:\n%s\n", recv_buf);
     req.method = strtok(recv_buf, " \t\r\n");
     req.uri = strtok(NULL, " \t");
     req.proto = strtok(NULL,  " \t\r\n");
@@ -114,6 +115,7 @@ char* get_errorMsg_html_code(char* status_code, char* file_path){
     sprintf(temp, "<h1>%s</h1>", status_code);
     strcat(html_code, temp);
     if(strcmp(status_code, "301 Moved Permanently") == 0){
+	
     }else{
 	sprintf(temp, "<h3>You don't have permission to access %s on this server.</h3>", file_path);
         strcat(html_code, temp);
@@ -132,18 +134,23 @@ struct FileInfo get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_co
 struct FileInfo get_fileInfo(char* file_name){
     FileInfo fileInfo;
     struct stat stat_buf;
-    char file_path[128], idxHTML_file_path[128];
+    char file_path[128], abs_file_path[128], idxHTML_file_path[128];
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
+    printf("file_name: %s\ndocroot: %s\n", file_name, docroot);
+    printf("file path: %s\n", file_path);
+    realpath(file_path, abs_file_path);
+    printf("abs file path: %s\n", abs_file_path);
     fileInfo.MIME_type = (char*) "text/html";
     fileInfo.errorMsg_html_code = NULL;
-    if(stat(file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
+    if(stat(abs_file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
         fileInfo = get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
 	return fileInfo;
     }
-    fileInfo.abs_file_path = file_path;
+    strcpy(fileInfo.abs_file_path, file_path);
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
+            strcat(fileInfo.abs_file_path, (char*) "/");
             fileInfo = get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
 	    return fileInfo;
 	}
@@ -172,46 +179,51 @@ struct FileInfo get_fileInfo(char* file_name){
 }
 
 char* get_header(struct FileInfo fileInfo){
-    string header;	    
+    string header = "";	    
     char *content_len_buf = (char*) malloc(128 * sizeof(char));
     char *c_header = (char*) malloc(0xffff * sizeof(char));
     sprintf(content_len_buf, "%d", fileInfo.content_len);
-    header = (string("HTTP/1.1 ") + string(fileInfo.status_code) + CRLF +
-              string("Server: nginx") + CRLF +
-              string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF + 
-              string("Content-Length: ") + string(content_len_buf) + CRLF + CRLF);
+    header += string("HTTP/1.1 ") + string(fileInfo.status_code) + CRLF;
+    header += string("Server: nginx") + CRLF;
+    header += string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF;
+    header += string("Content-Length: ") + string(content_len_buf) + CRLF;
+    if(string(fileInfo.status_code) == string("301 Moved Permanently")){
+	printf("new file path: %s\n", fileInfo.abs_file_path);
+        header += string("Location: ") + string("/dir1/") + CRLF;
+    }
+    header += CRLF;
     strcpy(c_header, (char*) header.c_str());
+    printf("header:\n%s\n", header.c_str());
     return c_header;
 }
 
 void server_respond(int connfd){
     struct Request req;
     struct FileInfo fileInfo;
-    char sendBuf[0xfffff];
+    char header[0xfffff], body[0xfffff];
     int send_bytes;
     req = get_request(connfd); 
     if(strcmp(req.method, "GET") == 0){ // GET    
 	fileInfo = get_fileInfo(req.uri);	
-        strcpy(sendBuf, get_header(fileInfo));
-        if(write(connfd, sendBuf, strlen(sendBuf)) < 0){
-            fprintf(stderr, "send error\n");
+        strcpy(header, get_header(fileInfo));
+        if(write(connfd, header, strlen(header)) < 0){
+            fprintf(stderr, "send header error\n");
             exit(-1);
         }
-	if(fileInfo.errorMsg_html_code){	
+	if(fileInfo.errorMsg_html_code){ // status is unnormal	
 	    if(write(connfd, fileInfo.errorMsg_html_code, fileInfo.content_len) < 0){
                 fprintf(stderr, "send error\n");
                 exit(-1);
 	    }
-	    fclose(fileInfo.fp);
-	    exit(0);
-	}
-	while(!feof(fileInfo.fp)){
-	    send_bytes = fread(sendBuf, sizeof(char), sizeof(sendBuf), fileInfo.fp);
-	    if(send_bytes == 0)
-	        break;
-	    if(write(connfd, sendBuf, send_bytes) < 0){
-	        fprintf(stderr, "send error\n");
-		exit(-1);
+	}else{ // status is normal
+	    while(!feof(fileInfo.fp)){
+	        send_bytes = fread(body, sizeof(char), sizeof(body), fileInfo.fp);
+	        if(send_bytes == 0)
+	            break;
+	        if(write(connfd, body, send_bytes) < 0){
+	            fprintf(stderr, "send body error\n");
+	    	    exit(-1);
+	        }
 	    }
 	}
 	fclose(fileInfo.fp);

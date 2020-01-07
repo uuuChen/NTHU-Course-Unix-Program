@@ -110,15 +110,15 @@ char* get_errorMsg_html_code(char* status_code, char* file_path){
     char* html_code = (char*) malloc(0xfffff * sizeof(char));
     char* temp = (char*) malloc(0xfffff * sizeof(char));
     sprintf(html_code, "<html><head><title>%s</title></head>", status_code);
-    strcat(html_code, "<br>");
     strcat(html_code, "<body>");
+    sprintf(temp, "<h1>%s</h1>", status_code);
+    strcat(html_code, temp);
     if(strcmp(status_code, "301 Moved Permanently") == 0){
     }else{
 	sprintf(temp, "<h3>You don't have permission to access %s on this server.</h3>", file_path);
         strcat(html_code, temp);
     }
     strcat(html_code, "</body></html>");
-    printf("html_code: %s\n", html_code);
     return html_code;
 }
 
@@ -136,6 +136,7 @@ struct FileInfo get_fileInfo(char* file_name){
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
     fileInfo.MIME_type = (char*) "text/html";
+    fileInfo.errorMsg_html_code = NULL;
     if(stat(file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
         fileInfo = get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
 	return fileInfo;

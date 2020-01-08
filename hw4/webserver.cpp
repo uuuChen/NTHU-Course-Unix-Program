@@ -70,7 +70,7 @@ struct Request get_request(int connfd){
         exit(-1);
     }
     recv_buf[recv_bytes] = '\0';
-    printf("recv buf:\n%s\n", recv_buf);
+    printf("-----------------recv buf-----------------\n%s\n", recv_buf);
     req.method = strtok(recv_buf, " \t\r\n");
     req.uri = strtok(NULL, " \t");
     req.proto = strtok(NULL,  " \t\r\n");
@@ -107,6 +107,20 @@ char* get_file_MIME_type(char* file_name){
     return NULL;
 }
 
+char* get_fileName_from_charArr(char* array){
+    int i, arr_len;
+    string str_array;
+    char* file_name;
+    str_array = string(array);
+    arr_len = strlen(array);
+    for(i=arr_len-1; i>=0; i--){
+        if(array[i] == '/' && i != arr_len-1)
+	    break;
+    }
+    file_name = (char*) str_array.substr(i).c_str();
+    return file_name;
+}
+
 char* get_errorMsg_html_code(char* status_code, char* file_path){
     char* html_code = (char*) malloc(0xfffff * sizeof(char));
     char* temp = (char*) malloc(0xfffff * sizeof(char));
@@ -137,10 +151,7 @@ struct FileInfo get_fileInfo(char* file_name){
     char file_path[128], abs_file_path[128], idxHTML_file_path[128];
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
-    printf("file_name: %s\ndocroot: %s\n", file_name, docroot);
-    printf("file path: %s\n", file_path);
     realpath(file_path, abs_file_path);
-    printf("abs file path: %s\n", abs_file_path);
     fileInfo.MIME_type = (char*) "text/html";
     fileInfo.errorMsg_html_code = NULL;
     if(stat(abs_file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
@@ -188,12 +199,11 @@ char* get_header(struct FileInfo fileInfo){
     header += string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF;
     header += string("Content-Length: ") + string(content_len_buf) + CRLF;
     if(string(fileInfo.status_code) == string("301 Moved Permanently")){
-	printf("new file path: %s\n", fileInfo.abs_file_path);
-        header += string("Location: ") + string("/dir1/") + CRLF;
+        header += string("Location: ") + string(fileInfo.abs_file_path) + CRLF;
     }
     header += CRLF;
     strcpy(c_header, (char*) header.c_str());
-    printf("header:\n%s\n", header.c_str());
+    printf("-----------------send header-----------------\n%s\n", header.c_str());
     return c_header;
 }
 
@@ -204,7 +214,7 @@ void server_respond(int connfd){
     int send_bytes;
     req = get_request(connfd); 
     if(strcmp(req.method, "GET") == 0){ // GET    
-	fileInfo = get_fileInfo(req.uri);	
+	fileInfo = get_fileInfo(get_fileName_from_charArr(req.uri));	
         strcpy(header, get_header(fileInfo));
         if(write(connfd, header, strlen(header)) < 0){
             fprintf(stderr, "send header error\n");

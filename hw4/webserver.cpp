@@ -148,7 +148,7 @@ struct FileInfo get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_co
 struct FileInfo get_fileInfo(char* file_name){
     FileInfo fileInfo;
     struct stat stat_buf;
-    char file_path[128], abs_file_path[128], idxHTML_file_path[128];
+    char file_path[128], abs_file_path[128], idxHTML_file_path[128], command[512];
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
     realpath(file_path, abs_file_path);
@@ -161,7 +161,7 @@ struct FileInfo get_fileInfo(char* file_name){
     strcpy(fileInfo.abs_file_path, file_path);
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
-            strcat(fileInfo.abs_file_path, (char*) "/");
+            strcat(fileInfo.abs_file_path, "/");
             fileInfo = get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
 	    return fileInfo;
 	}
@@ -174,6 +174,17 @@ struct FileInfo get_fileInfo(char* file_name){
 	    fileInfo.fp = fopen(idxHTML_file_path, "rb");
 	}else{  // index.html does not exist
 	    printf("index.html does not exist\n");
+	    strcpy(command, "ls -al ");
+	    strcat(command, fileInfo.abs_file_path);
+	    strcat(command, " >ls.txt");
+	    if(system("ls -l") < 0){
+	        fprintf(stderr, "system command: %s error", command);
+		exit(-1);
+	    }
+	    stat("ls.txt", &stat_buf); 
+            fileInfo.MIME_type = (char*) "text/plain"; // .txt file
+	    fileInfo.content_len = stat_buf.st_size;
+	    fileInfo.fp = fopen("ls.txt", "rb");
 	}
     }else{ // other formats
         if((access(file_path, R_OK)) < 0){ // does not have read permission
@@ -203,7 +214,6 @@ char* get_header(struct FileInfo fileInfo){
     }
     header += CRLF;
     strcpy(c_header, (char*) header.c_str());
-    printf("-----------------send header-----------------\n%s\n", header.c_str());
     return c_header;
 }
 
@@ -216,6 +226,7 @@ void server_respond(int connfd){
     if(strcmp(req.method, "GET") == 0){ // GET    
 	fileInfo = get_fileInfo(get_fileName_from_charArr(req.uri));	
         strcpy(header, get_header(fileInfo));
+        printf("-----------------send header-----------------\n%s\n", header);
         if(write(connfd, header, strlen(header)) < 0){
             fprintf(stderr, "send header error\n");
             exit(-1);
@@ -228,6 +239,7 @@ void server_respond(int connfd){
 	}else{ // status is normal
 	    while(!feof(fileInfo.fp)){
 	        send_bytes = fread(body, sizeof(char), sizeof(body), fileInfo.fp);
+                printf("-----------------send body-----------------\n%s\n", body);
 	        if(send_bytes == 0)
 	            break;
 	        if(write(connfd, body, send_bytes) < 0){

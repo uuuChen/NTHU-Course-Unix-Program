@@ -1,0 +1,10 @@
+total 92
+drwxr-xr-x 3 uuuchen uuuchen  4096  1月  8 14:26 .
+drwxrwxr-x 7 uuuchen uuuchen  4096  1月  8 13:59 ..
+-rw-r--r-- 1 uuuchen uuuchen     0  1月  8 14:26 ls.txt
+-rw-r--r-- 1 uuuchen uuuchen    59  1月  6 18:20 makefile
+-rw-r--r-- 1 uuuchen uuuchen   490  1月  8 14:16 temp.txt
+drwxrwxr-x 4 uuuchen uuuchen  4096  1月  8 02:55 testcase
+-rwxr-xr-x 1 uuuchen uuuchen 29944  1月  8 14:26 webserver
+-rw-r--r-- 1 uuuchen uuuchen 10187  1月  8 14:26 webserver.cpp
+-rw-r--r-- 1 uuuchen uuuchen 28672  1月  8 14:26 .webserver.cpp.swp

@@ -140,7 +140,7 @@ char* get_errorMsg_html_code(char* status_code, char* file_path){
 
 void get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_code, char* file_path){
     fileInfo_ptr->status_code = status_code; 
-    fileInfo_ptr->errorMsg_html_code = get_errorMsg_html_code(fileInfo_ptr->status_code, file_path);
+    fileInfo_ptr->errorMsg_html_code = get_errorMsg_html_code(status_code, file_path);
     fileInfo_ptr->content_len = strlen(fileInfo_ptr->errorMsg_html_code);
 }
 
@@ -178,6 +178,10 @@ struct FileInfo get_fileInfo(char* file_name){
 	return fileInfo;
     }
     strcpy(fileInfo.abs_file_path, file_path);
+    if((access(file_path, R_OK)) < 0){ // file does not have read permission, use 404 intentionally
+        get_errorFileInfo(&fileInfo, (char*) "404 NOT FOUND", file_path);
+        return fileInfo;
+    }
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
             strcat(fileInfo.abs_file_path, "/");
@@ -197,15 +201,10 @@ struct FileInfo get_fileInfo(char* file_name){
 	    return fileInfo;
 	}
     }else{ // other formats
-        if((access(file_path, R_OK)) < 0){ // does not have read permission
-            get_errorFileInfo(&fileInfo, (char*) "404 NOT FOUND", file_path);
-	    return fileInfo;
-	}else{ // has read permission
-	    fileInfo.status_code = (char*) "200 OK";
-	    fileInfo.MIME_type = get_file_MIME_type(file_name);
-	    fileInfo.content_len = stat_buf.st_size;
-	    fileInfo.fp = fopen(file_path, "rb");
-	}
+        fileInfo.status_code = (char*) "200 OK";
+        fileInfo.MIME_type = get_file_MIME_type(file_name);
+        fileInfo.content_len = stat_buf.st_size;
+        fileInfo.fp = fopen(file_path, "rb");
     }
     return fileInfo;
 }

@@ -110,15 +110,18 @@ char* get_file_MIME_type(char* file_name){
 }
 
 char* get_fileName_from_charArr(char* array){
-    int i, arr_len;
-    string str_array;
-    str_array = string(array);
+    int i, j, arr_len;
+    char* file_name;
+    file_name = (char*) malloc(512 * sizeof(char));
     arr_len = strlen(array);
     for(i=arr_len-1; i>=0; i--){
         if(array[i] == '/' && i != arr_len-1)
 	    break;
     }
-    return (char*) str_array.substr(i).c_str();
+    for(j=0; j<arr_len-i; j++){
+        file_name[j] = array[i+j];
+    }
+    return file_name;
 }
 
 char* get_errorMsg_html_code(char* status_code, char* file_path){
@@ -165,6 +168,7 @@ void exec_ls_and_save_file(struct FileInfo* fileInfo, char* ls_file_path,
 }
 
 struct FileInfo get_fileInfo(char* file_name){
+    printf("file_name: %s\n", file_name);
     FileInfo fileInfo;
     struct stat stat_buf;
     char file_path[128], abs_file_path[128], idxHtml_file_path[128];

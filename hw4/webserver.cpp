@@ -9,6 +9,7 @@
 # include <unistd.h>
 # include <netinet/in.h>
 # include <arpa/inet.h>
+# include <errno.h>
 
 # define CRLF "\r\n"
 
@@ -74,6 +75,7 @@ struct Request get_request(int connfd){
     req.method = strtok(recv_buf, " \t\r\n");
     req.uri = strtok(NULL, " \t");
     req.proto = strtok(NULL,  " \t\r\n");
+    req.queryStr = NULL;
     if(queryStr = strchr(req.uri, '?')){ // "?" exist in "req.uri", remove string after it 
 	*queryStr++ = '\0'; 
 	req.queryStr = queryStr; 
@@ -110,15 +112,13 @@ char* get_file_MIME_type(char* file_name){
 char* get_fileName_from_charArr(char* array){
     int i, arr_len;
     string str_array;
-    char* file_name;
     str_array = string(array);
     arr_len = strlen(array);
     for(i=arr_len-1; i>=0; i--){
         if(array[i] == '/' && i != arr_len-1)
 	    break;
     }
-    file_name = (char*) str_array.substr(i).c_str();
-    return file_name;
+    return (char*) str_array.substr(i).c_str();
 }
 
 char* get_errorMsg_html_code(char* status_code, char* file_path){
@@ -138,57 +138,67 @@ char* get_errorMsg_html_code(char* status_code, char* file_path){
     return html_code;
 }
 
-struct FileInfo get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_code, char* file_path){
+void get_errorFileInfo(struct FileInfo* fileInfo_ptr, char* status_code, char* file_path){
     fileInfo_ptr->status_code = status_code; 
     fileInfo_ptr->errorMsg_html_code = get_errorMsg_html_code(fileInfo_ptr->status_code, file_path);
     fileInfo_ptr->content_len = strlen(fileInfo_ptr->errorMsg_html_code);
-    return *fileInfo_ptr;
+}
+
+void exec_ls_and_save_file(struct FileInfo* fileInfo, char* ls_file_path, 
+		char* redirect_file_path){
+    struct stat stat_buf;
+    char command[512];
+    FILE* fp;
+    strcpy(command, "ls -al ");
+    strcat(command, ls_file_path);
+    strcat(command, " > ");
+    strcat(command, redirect_file_path);
+    if((fp = popen(command, "w")) == NULL){
+        fprintf(stderr, "popen: %s error", strerror(errno));
+	exit(-1);
+    }
+    pclose(fp);
+    stat(redirect_file_path, &stat_buf); 
+    fileInfo->MIME_type = (char*) "text/plain"; // .txt file
+    fileInfo->content_len = stat_buf.st_size;
+    fileInfo->fp = fopen(redirect_file_path, "r");
 }
 
 struct FileInfo get_fileInfo(char* file_name){
     FileInfo fileInfo;
     struct stat stat_buf;
-    char file_path[128], abs_file_path[128], idxHTML_file_path[128], command[512];
+    char file_path[128], abs_file_path[128], idxHtml_file_path[128];
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
     realpath(file_path, abs_file_path);
     fileInfo.MIME_type = (char*) "text/html";
     fileInfo.errorMsg_html_code = NULL;
     if(stat(abs_file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
-        fileInfo = get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
+        get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
 	return fileInfo;
     }
     strcpy(fileInfo.abs_file_path, file_path);
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
             strcat(fileInfo.abs_file_path, "/");
-            fileInfo = get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
+            get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
 	    return fileInfo;
 	}
 	fileInfo.status_code = (char*) "200 OK";
-	strcpy(idxHTML_file_path, file_path);
-	strcat(idxHTML_file_path, "index.html");
-        if(check_file_exist(idxHTML_file_path)){ // index.html exists
-	    stat(idxHTML_file_path, &stat_buf); 
+	strcpy(idxHtml_file_path, file_path);
+	strcat(idxHtml_file_path, "index.html");
+        if(check_file_exist(idxHtml_file_path)){ // index.html exists
+	    stat(idxHtml_file_path, &stat_buf); 
 	    fileInfo.content_len = stat_buf.st_size;
-	    fileInfo.fp = fopen(idxHTML_file_path, "rb");
+	    fileInfo.fp = fopen(idxHtml_file_path, "rb");
 	}else{  // index.html does not exist
-	    printf("index.html does not exist\n");
-	    strcpy(command, "ls -al ");
-	    strcat(command, fileInfo.abs_file_path);
-	    strcat(command, " >ls.txt");
-	    if(system("ls -l") < 0){
-	        fprintf(stderr, "system command: %s error", command);
-		exit(-1);
-	    }
-	    stat("ls.txt", &stat_buf); 
-            fileInfo.MIME_type = (char*) "text/plain"; // .txt file
-	    fileInfo.content_len = stat_buf.st_size;
-	    fileInfo.fp = fopen("ls.txt", "rb");
+	    char* redirect_file_path = (char*) "./ls.txt";
+	    exec_ls_and_save_file(&fileInfo, fileInfo.abs_file_path, redirect_file_path);
+	    return fileInfo;
 	}
     }else{ // other formats
         if((access(file_path, R_OK)) < 0){ // does not have read permission
-            fileInfo = get_errorFileInfo(&fileInfo, (char*) "404 NOT FOUND", file_path);
+            get_errorFileInfo(&fileInfo, (char*) "404 NOT FOUND", file_path);
 	    return fileInfo;
 	}else{ // has read permission
 	    fileInfo.status_code = (char*) "200 OK";

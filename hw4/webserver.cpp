@@ -5,6 +5,7 @@
 # include <signal.h>
 # include <sys/stat.h>
 # include <sys/types.h>
+# include <sys/wait.h>
 # include <sys/socket.h>
 # include <unistd.h>
 # include <netinet/in.h>
@@ -204,9 +205,20 @@ char* get_cmdPath_in_shell(char* cmd){
     return NULL;
 }
 
+int get_openedFile_bytes(FILE* fp){
+    int size;
+    fseek(fp, 0, SEEK_END);
+    size = ftell(fp);
+    if(size < 0)
+        fprintf(stderr, "read bytes error: %s\n", strerror(errno));
+    fseek(fp, 0, SEEK_SET);
+    printf("size: %d\n", size);
+    return size;
+}
+
 void CGI(struct FileInfo* fileInfo, char* file_path, char* file_ext){
-    int i, pid, ser2cgiFd[2], cgi2serFd[2];
-    char exec_filepath[128];
+    int i, pid, readBytes, rtn_pid, stat_val, ser2cgiFd[2], cgi2serFd[2];
+    char exec_filepath[128], line[1024];
     char **exec_argv;
     if(pipe(ser2cgiFd) < 0 || pipe(cgi2serFd) < 0){
         fprintf(stderr, "pipe error: %s", strerror(errno));
@@ -216,9 +228,29 @@ void CGI(struct FileInfo* fileInfo, char* file_path, char* file_ext){
     }else if(pid > 0){ // parent
 	close(ser2cgiFd[0]);
 	close(cgi2serFd[1]);
-    }else{
+        if((rtn_pid = waitpid(pid, &stat_val, 0)) != pid){  // block and wait for child process
+	    if(errno != ECHILD){
+   	        fprintf(stderr, "get wrong pid %d: %s\n", rtn_pid, strerror(errno));
+	        exit(-1);
+	    }
+	}
+  	fileInfo->MIME_type = (char*) "text/plain"; // .txt file 
+        fileInfo->fp = fdopen(cgi2serFd[0], "r");
+	fileInfo->content_len = get_openedFile_bytes(fileInfo->fp);
+	fileInfo->content_len = 200;
+	while(1){
+	    if((readBytes = read(cgi2serFd[0], line, 1024) < 0)){
+	        fprintf(stderr, "read error: %s\n", strerror(errno));
+		exit(-1);
+	    }
+	    printf("%s\n", line);
+	    if(readBytes == 0)
+		break;
+	}
+    }else{ // child
 	close(ser2cgiFd[1]);
 	close(cgi2serFd[0]);
+	// dup file descriptor to stdin, stdout
 	if(ser2cgiFd[0] != STDIN_FILENO){
 	    if(dup2(ser2cgiFd[0], STDIN_FILENO) != STDIN_FILENO){
 	        fprintf(stderr, "dup2 error to stdin: %s\n", strerror(errno));
@@ -233,6 +265,7 @@ void CGI(struct FileInfo* fileInfo, char* file_path, char* file_ext){
 	    }
 	    close(cgi2serFd[1]);
 	}
+	// execute command
 	strcpy(exec_filepath, get_cmdPath_in_shell(file_ext));
 	if(!exec_filepath){
 	    fprintf(stderr, "cmd not exist: %s\n", file_ext);
@@ -303,13 +336,13 @@ struct FileInfo get_fileInfo(char* file_name){
 
 char* get_header(struct FileInfo fileInfo){
     string header = "";	    
-    char *content_len_buf = (char*) malloc(128 * sizeof(char));
+    char *content_len = (char*) malloc(128 * sizeof(char));
     char *c_header = (char*) malloc(0xffff * sizeof(char));
-    sprintf(content_len_buf, "%d", fileInfo.content_len);
+    sprintf(content_len, "%d", fileInfo.content_len);
     header += string("HTTP/1.1 ") + string(fileInfo.status_code) + CRLF;
     header += string("Server: nginx") + CRLF;
     header += string("Content-Type: ") + string(fileInfo.MIME_type) + CRLF;
-    header += string("Content-Length: ") + string(content_len_buf) + CRLF;
+    header += string("Content-Length: ") + string(content_len) + CRLF;
     if(string(fileInfo.status_code) == string("301 Moved Permanently")){
         header += string("Location: ") + string(fileInfo.abs_file_path) + CRLF;
     }
@@ -334,15 +367,17 @@ void server_respond(int connfd){
             fprintf(stderr, "send header error\n");
             exit(-1);
         }
+        printf("-----------------send body-----------------\n");
 	if(fileInfo.errorMsg_html_code){ // status is unnormal	
 	    if(write(connfd, fileInfo.errorMsg_html_code, fileInfo.content_len) < 0){
                 fprintf(stderr, "send error\n");
                 exit(-1);
 	    }
+	    printf("%s\n", fileInfo.errorMsg_html_code);
 	}else{ // status is normal
 	    while(!feof(fileInfo.fp)){
 	        send_bytes = fread(body, sizeof(char), sizeof(body), fileInfo.fp);
-                printf("-----------------send body-----------------\n%s\n", body);
+		printf("%s\n", body);
 	        if(send_bytes == 0)
 	            break;
 	        if(write(connfd, body, send_bytes) < 0){

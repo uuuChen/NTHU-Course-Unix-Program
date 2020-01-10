@@ -15,6 +15,8 @@
 
 using namespace std;
 
+extern char** environ;
+
 char docroot[128];
 
 struct Request {
@@ -93,14 +95,21 @@ bool check_file_exist(char* file_path){
     }
 }
 
+char* get_file_ext(char* file_name){
+    char *file_ext, *file_name_cpy;
+    file_name_cpy = (char*) malloc((strlen(file_name)+1) * sizeof(char));
+    strcpy(file_name_cpy, file_name);
+    if((file_ext = strchr(file_name_cpy, '.')) == NULL){
+	return NULL;
+    }
+    *file_ext++ = '\0';
+    return file_ext;
+}
+
 char* get_file_MIME_type(char* file_name){
     char *file_ext;
     int i;
-    if((file_ext = strchr(file_name, '.')) == NULL){
-        fprintf(stderr, "strchr error\n"); 
-	exit(-1);
-    }
-    *file_ext++ = '\0';
+    file_ext = get_file_ext(file_name);
     for(i=0; extensions[i].ext != 0; i++){
         if(strcmp(file_ext, extensions[i].ext) == 0){
 	    return extensions[i].MIME_type;
@@ -132,7 +141,8 @@ char* get_errorMsg_html_code(char* status_code, char* file_path){
     sprintf(temp, "<h1>%s</h1>", status_code);
     strcat(html_code, temp);
     if(strcmp(status_code, "301 Moved Permanently") == 0){
-	
+	sprintf(temp, "<h3> Move to %s.</h3>", file_path);
+        strcat(html_code, temp);
     }else{
 	sprintf(temp, "<h3>You don't have permission to access %s on this server.</h3>", file_path);
         strcat(html_code, temp);
@@ -167,16 +177,93 @@ void exec_ls_and_save_file(struct FileInfo* fileInfo, char* ls_file_path,
     fileInfo->fp = fopen(redirect_file_path, "r");
 }
 
+bool use_CGI(char* file_ext){
+    if(file_ext){
+        if(strcmp(file_ext, (char*) "php") == 0 || 
+           strcmp(file_ext, (char*) "sh") == 0)
+            return true;
+        else
+            return false;
+    }
+    return false;
+}
+
+char* get_cmdPath_in_shell(char* cmd){
+    FILE *fp;
+    char *cmd_dirs[2] = {(char*) "/bin/", (char*) "/usr/bin/"};
+    char *cmd_path;
+    int i;
+    cmd_path = (char*) malloc(128 * sizeof(char));
+    for(i=0; i<2; i++){
+	strcpy(cmd_path, cmd_dirs[i]);
+	strcat(cmd_path, cmd);
+        if((fp=fopen(cmd_path, "r")) != NULL){
+	    return cmd_path;
+	}
+    }
+    return NULL;
+}
+
+void CGI(struct FileInfo* fileInfo, char* file_path, char* file_ext){
+    int i, pid, ser2cgiFd[2], cgi2serFd[2];
+    char exec_filepath[128];
+    char **exec_argv;
+    if(pipe(ser2cgiFd) < 0 || pipe(cgi2serFd) < 0){
+        fprintf(stderr, "pipe error: %s", strerror(errno));
+    }
+    if((pid = fork()) < 0){
+        fprintf(stderr, "fork error: %s", strerror(errno));
+    }else if(pid > 0){ // parent
+	close(ser2cgiFd[0]);
+	close(cgi2serFd[1]);
+    }else{
+	close(ser2cgiFd[1]);
+	close(cgi2serFd[0]);
+	if(ser2cgiFd[0] != STDIN_FILENO){
+	    if(dup2(ser2cgiFd[0], STDIN_FILENO) != STDIN_FILENO){
+	        fprintf(stderr, "dup2 error to stdin: %s\n", strerror(errno));
+		exit(-1);
+	    }
+	    close(ser2cgiFd[0]);
+	}
+	if(cgi2serFd[1] != STDOUT_FILENO){
+	    if(dup2(cgi2serFd[1], STDOUT_FILENO) != STDOUT_FILENO){
+	        fprintf(stderr, "dup2 error to stdout: %s\n", strerror(errno));
+		exit(-1);
+	    }
+	    close(cgi2serFd[1]);
+	}
+	strcpy(exec_filepath, get_cmdPath_in_shell(file_ext));
+	if(!exec_filepath){
+	    fprintf(stderr, "cmd not exist: %s\n", file_ext);
+	    exit(-1);
+	}
+	exec_argv = (char**) malloc(3 * sizeof(char*) + 1);
+	exec_argv[0] = exec_filepath;
+	exec_argv[1] = file_path;
+	exec_argv[2] = NULL;
+	if(execve(exec_filepath, exec_argv, environ) < 0){
+	    fprintf(stderr, "execve error: %s\n", strerror(errno));
+	    exit(-1);
+	}
+    }
+}
+
 struct FileInfo get_fileInfo(char* file_name){
-    printf("file_name: %s\n", file_name);
     FileInfo fileInfo;
     struct stat stat_buf;
     char file_path[128], abs_file_path[128], idxHtml_file_path[128];
+    char *redirect_file_path, *file_ext;
+    file_ext = get_file_ext(file_name);
     strcpy(file_path, docroot);
     strcat(file_path, file_name);
     realpath(file_path, abs_file_path);
     fileInfo.MIME_type = (char*) "text/html";
     fileInfo.errorMsg_html_code = NULL;
+    if(use_CGI(file_ext)){  // use common gateway interface
+        CGI(&fileInfo, abs_file_path, file_ext);
+        return fileInfo;
+    }
     if(stat(abs_file_path, &stat_buf) < 0){ // file does not exist, use 403 intentionally
         get_errorFileInfo(&fileInfo, (char*) "403 Forbidden", file_path);
 	return fileInfo;
@@ -189,7 +276,7 @@ struct FileInfo get_fileInfo(char* file_name){
     if(S_ISDIR(stat_buf.st_mode)){ // file is a directory
 	if(file_path[strlen(file_path)-1] != '/'){ // directory without slash
             strcat(fileInfo.abs_file_path, "/");
-            get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", file_path);
+            get_errorFileInfo(&fileInfo, (char*) "301 Moved Permanently", fileInfo.abs_file_path);
 	    return fileInfo;
 	}
 	fileInfo.status_code = (char*) "200 OK";
@@ -200,15 +287,16 @@ struct FileInfo get_fileInfo(char* file_name){
 	    fileInfo.content_len = stat_buf.st_size;
 	    fileInfo.fp = fopen(idxHtml_file_path, "rb");
 	}else{  // index.html does not exist
-	    char* redirect_file_path = (char*) "./ls.txt";
+	    redirect_file_path = (char*) "./ls.txt";
 	    exec_ls_and_save_file(&fileInfo, fileInfo.abs_file_path, redirect_file_path);
 	    return fileInfo;
 	}
-    }else{ // other formats
+    }else{ // other file formats
         fileInfo.status_code = (char*) "200 OK";
         fileInfo.MIME_type = get_file_MIME_type(file_name);
         fileInfo.content_len = stat_buf.st_size;
         fileInfo.fp = fopen(file_path, "rb");
+	
     }
     return fileInfo;
 }
@@ -234,10 +322,12 @@ void server_respond(int connfd){
     struct Request req;
     struct FileInfo fileInfo;
     char header[0xfffff], body[0xfffff];
+    char* file_name;
     int send_bytes;
     req = get_request(connfd); 
     if(strcmp(req.method, "GET") == 0){ // GET    
-	fileInfo = get_fileInfo(get_fileName_from_charArr(req.uri));	
+	file_name = get_fileName_from_charArr(req.uri);
+	fileInfo = get_fileInfo(file_name);	
         strcpy(header, get_header(fileInfo));
         printf("-----------------send header-----------------\n%s\n", header);
         if(write(connfd, header, strlen(header)) < 0){

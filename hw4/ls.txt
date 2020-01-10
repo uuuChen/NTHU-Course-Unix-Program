@@ -1,8 +1,0 @@
-total 8
-drwxrwxr-x 2 uuuchen uuuchen 4096  5月 24  2016 .
-drwxrwxr-x 5 uuuchen uuuchen 4096  1月 10 15:34 ..
-lrwxrwxrwx 1 uuuchen uuuchen   12  1月  6 18:16 audio.ogg -> ../audio.ogg
-lrwxrwxrwx 1 uuuchen uuuchen   12  1月  6 18:16 image.png -> ../image.png
-lrwxrwxrwx 1 uuuchen uuuchen   12  1月  6 18:16 plain.txt -> ../plain.txt
-lrwxrwxrwx 1 uuuchen uuuchen   14  1月  6 18:16 simple.html -> ../simple.html
-lrwxrwxrwx 1 uuuchen uuuchen   12  1月  6 18:16 video.mp4 -> ../video.mp4
